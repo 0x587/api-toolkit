@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from sqlmodel import create_engine, SQLModel, Session, Field
 # from crud import SQLModelCRUDRouter
 
-from state_machine import StateBase, StateItemBase, StateItemCRUDRouter, StatusRegistrar
+from state_item import StateBase, StateItemBase, StateItemCRUDRouter, StatusRegistrar
 
 engine = create_engine('sqlite:///sqlite.db', echo=True)
 

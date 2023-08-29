@@ -47,7 +47,7 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
                 self._get_all_in_state(),
                 methods=["GET"],
                 response_model=Optional[List[self.schema]],  # type: ignore
-                summary="Get all items in state",
+                summary="Get all items in this state",
                 dependencies=get_all_in_state_route,
             )
         if create_in_state_route:
@@ -56,7 +56,7 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
                 self._create_in_state(),
                 methods=["POST"],
                 response_model=self.schema,  # type: ignore
-                summary="Create item in state",
+                summary="Create item in this state",
                 dependencies=create_in_state_route,
             )
         if delete_all_in_state_route:
@@ -65,9 +65,18 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
                 self._delete_all_in_state(),
                 methods=["DELETE"],
                 response_model=Optional[List[self.schema]],  # type: ignore
-                summary="Delete all items in state",
+                summary="Delete all items in this state",
                 dependencies=delete_all_in_state_route,
             )
+        if self.registrar:
+            for (from_state, to_state), trans_info in self.registrar.transitions().items():
+                self._add_api_route(
+                    f"/transition/{from_state.name}-to-{to_state.name}",
+                    trans_info.func,
+                    methods=["POST"],
+                    summary=f"Transition this item from state {from_state.name} to state {to_state.name}",
+                    dependencies=trans_info.dependencies
+                )
 
     @abstractmethod
     def _get_all_in_state(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:

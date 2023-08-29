@@ -26,6 +26,10 @@ class ProductState(StateBase):
 registry = StatusRegistrar(ProductState, Type["Product"])
 
 
+class ProductCreate(SQLModel):
+    name: str
+
+
 class Product(StateItemBase, table=True):
     id: Optional[int] = Field(primary_key=True)
     state: ProductState = Field(index=True, default=ProductState.Order)
@@ -51,7 +55,8 @@ class Product(StateItemBase, table=True):
 api = StateItemCRUDRouter(
     registrar=registry,
     db_func=get_db,
-    db_model=Product
+    db_model=Product,
+    create_schema=ProductCreate,
 )
 app.include_router(api)
 

@@ -1,16 +1,17 @@
-from typing import Any, Callable, List, Type, Generator, Optional, Union
+from typing import Any, Callable, List, Type, Optional, Union
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends
 
 from .base import CRUDGenerator, NOT_FOUND
 from . import utils
-from .types import DEPENDENCIES, PAGINATION, PYDANTIC_SCHEMA as SCHEMA
+from .types import DEPENDENCIES, PYDANTIC_SCHEMA as SCHEMA
 
 try:
     from sqlmodel import SQLModel, Session, select
 except ImportError:
     SQLModel = None
     Session = None
+    select = None
     sqlmodel_installed = False
 else:
     sqlmodel_installed = True

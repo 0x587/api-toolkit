@@ -1,13 +1,16 @@
 from abc import ABC, abstractmethod
 from typing import List, Type, Optional, Union, Any, Callable
 
+from fastapi import HTTPException
 from sqlmodel import SQLModel
 
-from crud import CRUDGenerator, SQLModelCRUDRouter
+from crud import SQLModelCRUDRouter
 from crud.crud import SESSION_FUNC
 from .types import T, DEPENDENCIES
 from .utils import StatusRegistrar
 from .models import StateItemBase
+
+BAD_REQUEST = HTTPException(400, "Bad Request")
 
 
 class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
@@ -28,7 +31,8 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
             get_all_in_state_route: Union[bool, DEPENDENCIES] = True,
             get_one_route: Union[bool, DEPENDENCIES] = True,
             create_route: Union[bool, DEPENDENCIES] = True,
-            create_in_state_route: Union[bool, DEPENDENCIES] = True,
+            # unimplemented
+            create_in_state_route: Union[bool, DEPENDENCIES] = False,
             update_route: Union[bool, DEPENDENCIES] = True,
             delete_one_route: Union[bool, DEPENDENCIES] = True,
             delete_all_route: Union[bool, DEPENDENCIES] = True,
@@ -75,6 +79,8 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
                     trans_info.func,
                     methods=["POST"],
                     summary=f"Transition this item from state {from_state.name} to state {to_state.name}",
+                    response_model=self.registrar.response_model(),
+                    error_responses=[BAD_REQUEST],
                     dependencies=trans_info.dependencies
                 )
 

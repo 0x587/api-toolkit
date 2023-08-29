@@ -1,8 +1,6 @@
-import datetime
-from typing import Optional, Type
+from typing import Optional
 from fastapi import FastAPI
 from sqlmodel import create_engine, SQLModel, Session, Field
-# from crud import SQLModelCRUDRouter
 
 from state_item import StateBase, StateItemBase, StateItemCRUDRouter, StatusRegistrar
 
@@ -16,6 +14,8 @@ def get_db():
 app = FastAPI()
 
 
+########################################################################################################################
+# define state model
 class ProductState(StateBase):
     Order = 1  # 下单
     Produce = 2  # 生产
@@ -23,13 +23,16 @@ class ProductState(StateBase):
     Received = 4  # 收货
 
 
-registry = StatusRegistrar(ProductState, Type["Product"])
+# define state item registrar
+registry = StatusRegistrar(get_db)
 
 
+# define state item model
 class ProductCreate(SQLModel):
     name: str
 
 
+# define state item model
 class Product(StateItemBase, table=True):
     id: Optional[int] = Field(primary_key=True)
     state: ProductState = Field(index=True, default=ProductState.Order)
@@ -52,25 +55,23 @@ class Product(StateItemBase, table=True):
         pass
 
 
+# bind state item model to registrar
+registry.bind(ProductState, Product)
+
+# make state item api router
 api = StateItemCRUDRouter(
     registrar=registry,
     db_func=get_db,
     db_model=Product,
     create_schema=ProductCreate,
 )
-app.include_router(api)
 
+# add state item api router to fastapi
+app.include_router(api)
+########################################################################################################################
+
+# run app
 import uvicorn
 
 SQLModel.metadata.create_all(engine)
 uvicorn.run(app)
-
-# p = Product(name="test", created_time=datetime.datetime.now(), updated_time=datetime.datetime.now())
-# print(p)
-# p.order_to_produce(1)
-# print(p)
-# p.produce_to_shipped("shanghai", "receiver")
-# print(p)
-# p.shipped_to_received()
-# print(p)
-# p.shipped_to_received()

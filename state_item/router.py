@@ -1,11 +1,9 @@
-from typing import Any, Callable, Type, Optional, List, Union
+from typing import Any, Callable, List
 
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 from sqlmodel import Session, select, SQLModel
 
-from crud import SQLModelCRUDRouter, CRUDGenerator
-from crud.crud import CALLABLE_LIST, SESSION_FUNC
-from crud.types import DEPENDENCIES, PYDANTIC_SCHEMA as SCHEMA
+from crud.crud import CALLABLE_LIST
 
 from .base import StateItemCRUDGenerator
 

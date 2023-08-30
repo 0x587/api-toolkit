@@ -1,6 +1,8 @@
 from typing import Optional
-from fastapi import FastAPI
+from fastapi import FastAPI, Response
+from fastapi.openapi.models import ExternalDocumentation
 from sqlmodel import create_engine, SQLModel, Session, Field
+from starlette.responses import FileResponse
 
 from state_item import StateBase, StateItemBase, StateItemCRUDRouter, StatusRegistrar
 
@@ -21,10 +23,11 @@ class ProductState(StateBase):
     Produce = 2  # 生产
     Shipped = 3  # 发货
     Received = 4  # 收货
+    Missed = 5  # 丢失
 
 
 # define state item registrar
-registry = StatusRegistrar(get_db)
+registry = StatusRegistrar(get_db, app)
 
 
 # define state item model
@@ -41,17 +44,25 @@ class Product(StateItemBase, table=True):
     destination: Optional[str]
     receiver: Optional[str]
 
-    @registry.register(ProductState.Order, ProductState.Produce)
+    @registry.register(ProductState.Order, ProductState.Produce, 'make product')
     def order_to_produce(self, factory_id: int):
         self.factory_id = factory_id
 
-    @registry.register(ProductState.Produce, ProductState.Shipped)
+    @registry.register(ProductState.Produce, ProductState.Shipped, 'deliver')
     def produce_to_shipped(self, destination: str, receiver: str):
         self.destination = destination
         self.receiver = receiver
 
-    @registry.register(ProductState.Shipped, ProductState.Received)
+    @registry.register(ProductState.Shipped, ProductState.Received, 'receive')
     def shipped_to_received(self):
+        pass
+
+    @registry.register(ProductState.Shipped, ProductState.Missed, 'miss')
+    def shipped_to_missed(self):
+        pass
+
+    @registry.register(ProductState.Missed, ProductState.Received, 'receive')
+    def missed_to_received(self):
         pass
 
 

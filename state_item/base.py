@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from typing import List, Type, Optional, Union, Any, Callable
 
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
+from graphviz import Digraph
 from sqlmodel import SQLModel
 
 from crud import SQLModelCRUDRouter
@@ -83,6 +84,13 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
                     error_responses=[BAD_REQUEST],
                     dependencies=trans_info.dependencies
                 )
+            self._add_api_route(
+                f"/flow/chart",
+                self._generate_flowchart,
+                methods=["GET"],
+                summary=f"Generate flowchart",
+                dependencies=[],
+            )
 
     @abstractmethod
     def _get_all_in_state(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
@@ -95,3 +103,19 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
     @abstractmethod
     def _delete_all_in_state(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
         raise NotImplementedError
+
+    def _generate_flowchart(self):
+        dot = Digraph(comment=f'{self.prefix} Flowchart')
+        dot.attr(rankdir='LR')
+        dot.attr(fontname='FangSong')
+        for state in self.registrar.state_type.__members__.values():
+            dot.node(str(state.value), state.name)
+        for (from_state, to_state), v in self.registrar.state_transition_process.items():
+            print(v.name)
+            dot.edge(str(from_state.value), str(to_state.value), label=v.name)
+
+        image_data = dot.pipe(format='png')
+
+        response = Response(content=image_data)
+        response.headers['Content-Type'] = 'image/png'
+        return response

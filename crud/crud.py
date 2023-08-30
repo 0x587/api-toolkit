@@ -1,4 +1,4 @@
-from typing import Any, Callable, List, Type, Optional, Union
+from typing import Any, Callable, List, Type, Optional, Union, Generator
 
 from fastapi import Depends
 
@@ -19,7 +19,7 @@ else:
 CALLABLE = Callable[..., SQLModel]
 CALLABLE_LIST = Callable[..., List[SQLModel]]
 
-SESSION_FUNC = Callable[..., Session]
+SESSION_FUNC = Callable[..., Generator[Session, Any, None]]
 
 
 class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):

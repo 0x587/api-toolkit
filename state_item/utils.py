@@ -1,5 +1,6 @@
 import datetime
-from typing import Generic, Type, TypeVar, Dict, Tuple, Callable, Union, Optional, Sequence, get_type_hints, List
+from typing import Generic, Type, TypeVar, Dict, Tuple, Callable, Union, Optional, Sequence, get_type_hints, List, Any, \
+    Generator
 
 from fastapi import Depends, HTTPException, status, FastAPI
 from pydantic import BaseModel
@@ -30,7 +31,7 @@ class StatusRegistrar(Generic[StateType, StateItemType]):
     state_type = Type[StateType]
     state_item_type: Type[StateItemType]
     _state_transition_process: Dict[StateTransIdentifier, StateTransInfo] = {}
-    _db_func: Callable[[], Session]
+    _db_func: Callable[..., Generator[Session, Any, None]]
 
     class Model(BaseModel):
         code: int = 200
@@ -39,7 +40,7 @@ class StatusRegistrar(Generic[StateType, StateItemType]):
     def response_model(self):
         return self.Model
 
-    def __init__(self, db_func: Callable[[], Session], app: FastAPI):
+    def __init__(self, db_func: Callable[..., Generator[Session, Any, None]], app: FastAPI):
         self._db_func = db_func
         self.app = app
 

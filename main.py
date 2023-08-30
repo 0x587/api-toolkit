@@ -10,7 +10,11 @@ engine = create_engine('sqlite:///sqlite.db', echo=True)
 
 
 def get_db():
-    return Session(engine)
+    session = Session(engine)
+    try:
+        yield session
+    finally:
+        session.close()
 
 
 app = FastAPI()

@@ -1,12 +1,29 @@
 from typing import Optional
-from fastapi import FastAPI, Response
-from fastapi.openapi.models import ExternalDocumentation
+from fastapi import FastAPI
+from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.orm import sessionmaker
 from sqlmodel import create_engine, SQLModel, Session, Field
-from starlette.responses import FileResponse
+from sqlmodel.ext.asyncio.session import AsyncSession
 
 from state_item import StateBase, StateItemBase, StateItemCRUDRouter, StatusRegistrar
 
-engine = create_engine('sqlite:///sqlite.db', echo=True)
+from auth import AuthFactory
+
+engine = create_engine('sqlite:///sqlite.db')
+async_engine = create_async_engine("sqlite+aiosqlite:///sqlite.db", future=True)
+
+
+async def create_db_and_tables():
+    async with async_engine.begin() as conn:
+        await conn.run_sync(SQLModel.metadata.create_all)
+
+
+async def get_async_session() -> AsyncSession:
+    async_session = sessionmaker(
+        async_engine, class_=AsyncSession, expire_on_commit=False
+    )
+    async with async_session() as session:
+        yield session
 
 
 def get_db():
@@ -73,7 +90,7 @@ class Product(StateItemBase, table=True):
 # bind state item model to registrar
 registry.bind(ProductState, Product)
 
-# make state item api router
+# make state item api _router
 api = StateItemCRUDRouter(
     registrar=registry,
     db_func=get_db,
@@ -81,12 +98,24 @@ api = StateItemCRUDRouter(
     create_schema=ProductCreate,
 )
 
-# add state item api router to fastapi
+# add state item api _router to fastapi
 app.include_router(api)
+
 ########################################################################################################################
 
+from auth.config import AuthConfig
+
+auth = AuthFactory(AuthConfig())(get_async_session, 'secret')
+app.include_router(auth.router)
+
+########################################################################################################################
 # run app
 import uvicorn
 
-SQLModel.metadata.create_all(engine)
+
+@app.on_event("startup")
+async def on_startup():
+    await create_db_and_tables()
+
+
 uvicorn.run(app)

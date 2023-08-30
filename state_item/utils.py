@@ -1,6 +1,6 @@
 import datetime
-from typing import Generic, Type, TypeVar, Dict, Tuple, Callable, Union, Optional, Sequence, get_type_hints, List, Any, \
-    Generator
+from typing import Generic, Type, TypeVar, Dict, Tuple, Callable, Union, Optional, \
+    Sequence, get_type_hints, List, Any, Generator
 
 from fastapi import Depends, HTTPException, status, FastAPI
 from pydantic import BaseModel
@@ -51,7 +51,8 @@ class StatusRegistrar(Generic[StateType, StateItemType]):
             self.app.openapi_tags = []
         self.app.openapi_tags.append({
             "name": state_item_type.__name__,
-            "description": f"""<img src="/{state_item_type.__name__.lower()}/flow/chart" alt="{state_item_type.__name__}" />""",
+            "description": f"""<img src="/{state_item_type.__name__.lower()}/flow/chart" 
+            alt="{state_item_type.__name__}" />""",
         })
 
     def register(self, from_state: StateType, to_state: StateType,

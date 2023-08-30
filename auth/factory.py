@@ -8,7 +8,7 @@ from fastapi_users.authentication import (
     BearerTransport,
     JWTStrategy,
 )
-from fastapi_users_db_sqlmodel import SQLModelUserDatabase, SQLModelUserDatabaseAsync, SQLModelBaseUserDB
+from fastapi_users_db_sqlmodel import SQLModelUserDatabase, SQLModelUserDatabaseAsync
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .auth import Auth

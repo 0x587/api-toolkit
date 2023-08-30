@@ -111,7 +111,6 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
         for state in self.registrar.state_type.__members__.values():
             dot.node(str(state.value), state.name)
         for (from_state, to_state), v in self.registrar.state_transition_process.items():
-            print(v.name)
             dot.edge(str(from_state.value), str(to_state.value), label=v.name)
 
         image_data = dot.pipe(format='png')

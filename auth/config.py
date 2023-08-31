@@ -1,22 +1,19 @@
-from typing import Optional
+from typing import Type, Protocol
 
 from fastapi_users import schemas
 from fastapi_users_db_sqlmodel import SQLModelBaseUserDB
+from .models import BaseUser, BaseUserCreate, BaseUserUpdate, BaseGroup, BaseGroupCreate, BaseGroupUpdate, BaseGroupDB
 
 
-class AuthConfig:
-    class User(schemas.BaseUser):
-        first_name: Optional[str]
-        last_name: Optional[str]
+class AuthConfigBase(Protocol):
+    User: Type[schemas.BaseUser] = BaseUser
+    UserRead: Type[schemas.BaseUser] = BaseUser
+    UserCreate: Type[schemas.BaseUserCreate] = BaseUserCreate
+    UserUpdate: Type[schemas.BaseUserUpdate] = BaseUserUpdate
+    UserDB: Type[SQLModelBaseUserDB]
 
-    class UserRead(User):
-        pass
-
-    class UserCreate(schemas.BaseUserCreate, User):
-        pass
-
-    class UserUpdate(schemas.BaseUserUpdate, User):
-        pass
-
-    class UserDB(SQLModelBaseUserDB, User, table=True):
-        pass
+    Group: Type[BaseGroup] = BaseGroup
+    GroupRead: Type[BaseGroup] = BaseGroup
+    GroupCreate: Type[BaseGroupCreate] = BaseGroupCreate
+    GroupUpdate: Type[BaseGroupUpdate] = BaseGroupUpdate
+    GroupDB: Type[BaseGroupDB]

@@ -1,16 +1,24 @@
-from typing import Optional
-from fastapi import FastAPI
+from typing import Optional, List
+from fastapi import FastAPI, Depends
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy.orm import sessionmaker
 from sqlmodel import create_engine, SQLModel, Session, Field
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from auth.models import (BaseUser, BaseUserCreate, BaseUserUpdate, BaseUserDB,
+                         BaseGroup, BaseGroupCreate, BaseGroupUpdate, BaseGroupDB)
+from auth.config import AuthConfigBase
 from state_item import StateBase, StateItemBase, StateItemCRUDRouter, StatusRegistrar
 
 from auth import AuthFactory
 
-engine = create_engine('sqlite:///sqlite.db')
-async_engine = create_async_engine("sqlite+aiosqlite:///sqlite.db", future=True)
+user = 'main'
+password = 'YFZc6rfS5TjXH2kH'
+db_name = 'main'
+host = '8.134.109.183'
+
+engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db_name}")
+async_engine = create_async_engine(f"mysql+aiomysql://{user}:{password}@{host}/{db_name}", future=True)
 
 
 async def create_db_and_tables():
@@ -35,6 +43,50 @@ def get_db():
 
 
 app = FastAPI()
+
+
+########################################################################################################################
+
+
+class Config(AuthConfigBase):
+    class User(BaseUser):
+        name: int
+
+    class UserCreate(BaseUserCreate):
+        name: int
+
+    class UserUpdate(BaseUserUpdate):
+        name: Optional[int]
+
+    class UserDB(BaseUserDB, table=True):
+        name: int
+
+    class Group(BaseGroup):
+        name: str
+
+    class GroupCreate(BaseGroupCreate):
+        name: str
+
+    class GroupUpdate(BaseGroupUpdate):
+        name: str
+
+    class GroupDB(BaseGroupDB, table=True):
+        name: str
+
+
+auth = AuthFactory(Config)(get_async_session, 'secret')
+app.include_router(auth.router)
+
+
+@app.get('/hello')
+async def test(u: Config.UserDB = Depends(auth.current_user),
+               g: Config.GroupDB = Depends(auth.current_group),
+               gs: List[Config.GroupDB] = Depends(auth.own_groups)):
+    return {
+        'user': u,
+        'group': g,
+        'groups': gs
+    }
 
 
 ########################################################################################################################
@@ -103,12 +155,7 @@ app.include_router(api)
 
 ########################################################################################################################
 
-from auth.config import AuthConfig
 
-auth = AuthFactory(AuthConfig())(get_async_session, 'secret')
-app.include_router(auth.router)
-
-########################################################################################################################
 # run app
 import uvicorn
 

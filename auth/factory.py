@@ -14,7 +14,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 from .auth import Auth
 from .router import AuthRouter
 
-from .config import AuthConfig
+from .config import AuthConfigBase
 
 
 def make_auth_backend(secret: str) -> AuthenticationBackend:
@@ -32,12 +32,12 @@ def make_auth_backend(secret: str) -> AuthenticationBackend:
 
 
 class AuthFactory:
-    _config: AuthConfig = None
+    _config: AuthConfigBase = None
 
-    def __init__(self, config: AuthConfig):
+    def __init__(self, config: AuthConfigBase):
         self._config = config
 
-    def config(self) -> AuthConfig:
+    def config(self) -> AuthConfigBase:
         return self._config
 
     def _make_fastapi_users(self, get_async_session, secret: str) -> Tuple[FastAPIUsers, AuthenticationBackend]:
@@ -72,5 +72,5 @@ class AuthFactory:
 
     def __call__(self, get_async_session, secret: str) -> Auth:
         fastapi_users, auth_backend = self._make_fastapi_users(get_async_session, secret)
-        router = AuthRouter(fastapi_users, auth_backend, self.config())
-        return Auth(router, fastapi_users)
+        router = AuthRouter(fastapi_users, auth_backend, self.config(), get_async_session)
+        return Auth(self._config, router, fastapi_users, get_async_session)

@@ -5,6 +5,7 @@ from sqlalchemy.orm import sessionmaker
 from sqlmodel import create_engine, SQLModel, Session, Field
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from auth.item.models import AuthItemBase
 from auth.models import (BaseUser, BaseUserCreate, BaseUserUpdate, BaseUserDB,
                          BaseGroup, BaseGroupCreate, BaseGroupUpdate, BaseGroupDB)
 from auth.config import AuthConfigBase
@@ -87,6 +88,29 @@ async def test(u: Config.UserDB = Depends(auth.current_user),
         'group': g,
         'groups': gs
     }
+
+
+########################################################################################################################
+
+from auth.item.router import AuthCRUDRouter
+
+
+class Home(AuthItemBase, table=True):
+    pos: str
+
+
+class HomeCreate(SQLModel):
+    pos: str
+
+
+app.include_router(
+    AuthCRUDRouter(
+        auth=auth,
+        db_func=get_db,
+        db_model=Home,
+        create_schema=HomeCreate,
+    )
+)
 
 
 ########################################################################################################################

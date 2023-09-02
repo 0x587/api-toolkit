@@ -52,6 +52,7 @@ class AuthCRUDRouter(SQLModelCRUDRouter):
             update_route: Union[bool, DEPENDENCIES] = True,
             delete_one_route: Union[bool, DEPENDENCIES] = True,
             delete_all_route: Union[bool, DEPENDENCIES] = True,
+            change_owner_route: Union[bool, DEPENDENCIES] = True,
             **kwargs: Any
     ):
         self.auth = auth
@@ -79,7 +80,7 @@ class AuthCRUDRouter(SQLModelCRUDRouter):
             methods=["POST"],
             response_model=Optional[self.db_model],  # type: ignore
             summary="Change Owner",
-            dependencies=[],
+            dependencies=change_owner_route,
         )
 
     def _require_own_groups(self):

@@ -12,12 +12,14 @@ from auth.config import AuthConfigBase
 from state_item import StateBase, StateItemBase, StateItemCRUDRouter, StatusRegistrar
 
 from auth import AuthFactory
+import yaml
 
-user = 'main'
-password = 'YFZc6rfS5TjXH2kH'
-db_name = 'main'
-host = '8.134.109.183'
-
+with open('example.config.yaml', 'r') as file:
+    config_data = yaml.safe_load(file)
+    user = config_data['database']['user']
+    password = config_data['database']['password']
+    db_name = config_data['database']['db_name']
+    host = config_data['database']['host']
 engine = create_engine(f"mysql+pymysql://{user}:{password}@{host}/{db_name}")
 async_engine = create_async_engine(f"mysql+aiomysql://{user}:{password}@{host}/{db_name}", future=True)
 

@@ -3,7 +3,7 @@ from typing import Any, Callable, List
 from fastapi import Depends
 from sqlmodel import Session, select, SQLModel
 
-from crud.crud import CALLABLE_LIST
+from api_toolkit.crud.crud import CALLABLE_LIST
 
 from .base import StateItemCRUDGenerator
 

@@ -5,8 +5,8 @@ from fastapi import HTTPException, Response
 from graphviz import Digraph
 from sqlmodel import SQLModel
 
-from crud import SQLModelCRUDRouter
-from crud.crud import SESSION_FUNC
+from api_toolkit.crud import SQLModelCRUDRouter
+from api_toolkit.crud.crud import SESSION_FUNC
 from .types import T, DEPENDENCIES
 from .utils import StatusRegistrar
 from .models import StateItemBase

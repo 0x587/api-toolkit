@@ -5,8 +5,8 @@ from fastapi_users import FastAPIUsers
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from auth.config import AuthConfigBase
-from auth.models import UP, GP
+from api_toolkit.auth.config import AuthConfigBase
+from api_toolkit.auth.models import UP, GP
 
 NOT_ANY_GROUP = HTTPException(status_code=status.HTTP_404_NOT_FOUND,
                               detail="You are not in any group.")

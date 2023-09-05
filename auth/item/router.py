@@ -3,8 +3,8 @@ from typing import Any, Callable, List, Type, Optional, Union, Generator
 
 from pydantic import UUID4
 
-from crud import SQLModelCRUDRouter
-from crud.types import DEPENDENCIES, PYDANTIC_SCHEMA as SCHEMA
+from api_toolkit.crud import SQLModelCRUDRouter
+from api_toolkit.crud.types import DEPENDENCIES, PYDANTIC_SCHEMA as SCHEMA
 from .models import AuthItemBase
 from .. import Auth
 from ..models import GP

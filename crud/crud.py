@@ -1,8 +1,10 @@
+from enum import Enum
 from typing import Any, Callable, List, Type, Optional, Union, Generator
 
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from fastapi import Depends
+from sqlalchemy import text
 
 from .base import CRUDGenerator, NOT_FOUND
 from . import utils
@@ -65,9 +67,33 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
             **kwargs
         )
 
+    def _order_by_depend(self):
+        pure_fields = [field_name for field_name, field_type in self.db_model.__annotations__.items() if
+                       not hasattr(field_type, 'Config')]
+
+        fields_enum = Enum('Fields', {field_name: field_name for field_name in pure_fields})
+
+        class OrderDir(str, Enum):
+            asc = 'asc'
+            desc = 'desc'
+
+        def route(order_by: Optional[fields_enum] = None,
+                  order_dir: Optional[OrderDir] = None):
+            if not order_by:
+                return None
+            if order_by.value not in pure_fields:
+                raise ValueError(f"order_by value is not a valid field name: {order_by.value}")
+            if order_dir.value not in ['asc', 'desc']:
+                raise ValueError(f"order_dir value must be 'asc' or 'desc': {order_dir.value}")
+            return order_by, order_dir
+
+        return route
+
     def _get_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
-        def route(db: Session = Depends(self.db_func)) -> Page[SQLModel]:
-            return paginate(db, select(self.db_model))
+        def route(db: Session = Depends(self.db_func),
+                  order=Depends(self._order_by_depend())) -> Page[SQLModel]:
+            order_key, order_dir = order
+            return paginate(db, select(self.db_model).order_by(text(f'{order_key.value} {order_dir.value}')))
 
         return route
 

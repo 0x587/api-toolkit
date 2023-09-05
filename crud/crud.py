@@ -69,7 +69,7 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
         pure_fields = [field_name for field_name, field_type in self.db_model.__annotations__.items() if
                        not hasattr(field_type, 'Config')]
 
-        fields_enum = Enum('Fields', {field_name: field_name for field_name in pure_fields})
+        fields_enum = Enum('OrderFields', {field_name: field_name for field_name in pure_fields})
 
         class OrderDir(str, Enum):
             asc = 'asc'
@@ -79,7 +79,7 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
                   order_dir: Optional[OrderDir] = None):
             if not order_by:
                 return None
-            if order_by.value not in pure_fields:
+            if order_by not in fields_enum:
                 raise ValueError(f"order_by value is not a valid field name: {order_by.value}")
             if order_dir.value not in ['asc', 'desc']:
                 raise ValueError(f"order_dir value must be 'asc' or 'desc': {order_dir.value}")
@@ -87,11 +87,35 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
 
         return route
 
+    def _filter_by_depend(self):
+        pure_fields = [field_name for field_name, field_type in self.db_model.__annotations__.items() if
+                       not hasattr(field_type, 'Config')]
+
+        fields_enum = Enum('FilterFields', {field_name: field_name for field_name in pure_fields})
+
+        def route(filter_by: Optional[fields_enum] = None,
+                  filter_value: Any = None):
+            if not filter_by:
+                return None
+            if filter_by not in fields_enum:
+                raise ValueError(f"filter_by value is not a valid field name: {filter_by.value}")
+            return filter_by, filter_value
+
+        return route
+
     def _get_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
         def route(db: Session = Depends(self.db_func),
-                  order=Depends(self._order_by_depend())) -> Page[SQLModel]:
-            order_key, order_dir = order
-            return paginate(db, select(self.db_model).order_by(text(f'{order_key.value} {order_dir.value}')))
+                  order=Depends(self._order_by_depend()),
+                  filter_=Depends(self._filter_by_depend())) -> Page[SQLModel]:
+            query = select(self.db_model)
+            if order:
+                order_key, order_dir = order
+                query = query.order_by(text(f'{order_key.value} {order_dir.value}'))
+            if filter_:
+                filter_by, filter_value = filter_
+                # TODO: fix where clause
+                query = query.where(text(f'{filter_by.value} == {filter_value}'))
+            return paginate(db, query)
 
         return route
 

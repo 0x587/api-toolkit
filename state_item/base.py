@@ -27,7 +27,6 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
             update_schema: Optional[Type[T]] = None,
             prefix: Optional[str] = None,
             tags: Optional[List[str]] = None,
-            paginate: Optional[int] = None,
             get_all_route: Union[bool, DEPENDENCIES] = True,
             get_all_in_state_route: Union[bool, DEPENDENCIES] = True,
             get_one_route: Union[bool, DEPENDENCIES] = True,
@@ -41,7 +40,7 @@ class StateItemCRUDGenerator(SQLModelCRUDRouter, ABC):
             **kwargs: Any,
     ) -> None:
         super().__init__(
-            db_func, db_model, create_schema, update_schema, prefix, tags, paginate,
+            db_func, db_model, create_schema, update_schema, prefix, tags,
             get_all_route, get_one_route, create_route, update_route,
             delete_one_route, delete_all_route, **kwargs,
         )

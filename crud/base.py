@@ -6,7 +6,7 @@ from fastapi.types import DecoratedCallable
 from fastapi_pagination import Page
 
 from .types import T, DEPENDENCIES
-from .utils import pagination_factory, schema_factory
+from .utils import schema_factory
 
 NOT_FOUND = HTTPException(404, "Item not found")
 
@@ -24,7 +24,6 @@ class CRUDGenerator(Generic[T], APIRouter, ABC):
             update_schema: Optional[Type[T]] = None,
             prefix: Optional[str] = None,
             tags: Optional[List[str]] = None,
-            paginate: Optional[int] = None,
             get_all_route: Union[bool, DEPENDENCIES] = True,
             get_one_route: Union[bool, DEPENDENCIES] = True,
             create_route: Union[bool, DEPENDENCIES] = True,
@@ -33,7 +32,6 @@ class CRUDGenerator(Generic[T], APIRouter, ABC):
             delete_all_route: Union[bool, DEPENDENCIES] = True,
             **kwargs: Any,
     ) -> None:
-        self.pagination = pagination_factory(max_limit=paginate)
         self._pk: str = self._pk if hasattr(self, "_pk") else "id"
         self.schema = schema
         self.create_schema = (

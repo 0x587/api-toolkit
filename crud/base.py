@@ -3,6 +3,7 @@ from typing import Any, Callable, Generic, List, Optional, Type, Union
 
 from fastapi import APIRouter, HTTPException
 from fastapi.types import DecoratedCallable
+from fastapi_pagination import Page
 
 from .types import T, DEPENDENCIES
 from .utils import pagination_factory, schema_factory
@@ -57,7 +58,7 @@ class CRUDGenerator(Generic[T], APIRouter, ABC):
                 "",
                 self._get_all(),
                 methods=["GET"],
-                response_model=Optional[List[self.schema]],  # type: ignore
+                response_model=Page[self.schema],  # type: ignore
                 summary="Get All",
                 dependencies=get_all_route,
             )

@@ -1,5 +1,7 @@
 from typing import Any, Callable, List, Type, Optional, Union, Generator
 
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
 from fastapi import Depends
 
 from .base import CRUDGenerator, NOT_FOUND
@@ -17,7 +19,7 @@ else:
     sqlmodel_installed = True
 
 CALLABLE = Callable[..., SQLModel]
-CALLABLE_LIST = Callable[..., List[SQLModel]]
+CALLABLE_LIST = Callable[..., Page[SQLModel]]
 
 SESSION_FUNC = Callable[..., Generator[Session, Any, None]]
 
@@ -64,10 +66,8 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
         )
 
     def _get_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
-        def route(db: Session = Depends(self.db_func)) -> List[SQLModel]:
-            return db.exec(
-                select(self.db_model)
-            ).all()
+        def route(db: Session = Depends(self.db_func)) -> Page[SQLModel]:
+            return paginate(db, select(self.db_model))
 
         return route
 
@@ -117,7 +117,7 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
         return route
 
     def _delete_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
-        def route(db: Session = Depends(self.db_func)) -> List[SQLModel]:
+        def route(db: Session = Depends(self.db_func)) -> Page[SQLModel]:
             for item in db.exec(select(self.db_model)).all():
                 db.delete(item)
             db.commit()

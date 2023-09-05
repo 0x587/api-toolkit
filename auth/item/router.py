@@ -74,14 +74,15 @@ class AuthCRUDRouter(SQLModelCRUDRouter):
             delete_all_route=delete_all_route,
             **kwargs
         )
-        self._add_api_route(
-            path=f"/{{item_id}}/change_owner",
-            endpoint=self._change_owner(),
-            methods=["POST"],
-            response_model=Optional[self.db_model],  # type: ignore
-            summary="Change Owner",
-            dependencies=change_owner_route,
-        )
+        if change_owner_route:
+            self._add_api_route(
+                path=f"/{{item_id}}/change_owner",
+                endpoint=self._change_owner(),
+                methods=["POST"],
+                response_model=Optional[self.db_model],  # type: ignore
+                summary="Change Owner",
+                dependencies=False,
+            )
 
     def _require_own_groups(self):
         def route(group_id: Optional[UUID4] = None,

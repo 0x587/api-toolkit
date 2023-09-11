@@ -16,7 +16,7 @@ class GroupRouter(APIRouter):
             path="/register",
             endpoint=self._register(),
             methods=["POST"],
-            tags=["auth"],
+            tags=config.group_tags or ["auth"],
         )
 
     def _register(self):
@@ -42,12 +42,12 @@ class AuthRouter(APIRouter):
         self.include_router(
             fastapi_users.get_auth_router(auth_backend),
             prefix="/auth/jwt",
-            tags=["auth"],
+            tags=config.auth_tags or ["auth"],
         )
         self.include_router(
             fastapi_users.get_register_router(config.UserRead, config.UserCreate),
             prefix="/auth",
-            tags=["auth"],
+            tags=config.auth_tags or ["auth"],
         )
         # self.include_router(
         #     fastapi_users.get_reset_password_router(),
@@ -62,11 +62,11 @@ class AuthRouter(APIRouter):
         self.include_router(
             fastapi_users.get_users_router(config.UserRead, config.UserUpdate),
             prefix="/users",
-            tags=["users"],
+            tags=config.user_tags or ["auth"],
         )
 
         self.include_router(
             GroupRouter(config, get_async_session),
             prefix="/groups",
-            tags=["groups"],
+            tags=config.group_tags or ["auth"],
         )

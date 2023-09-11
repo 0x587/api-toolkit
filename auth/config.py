@@ -1,4 +1,4 @@
-from typing import Type, Protocol
+from typing import Type, Protocol, List, Optional
 
 from fastapi_users import schemas
 from fastapi_users_db_sqlmodel import SQLModelBaseUserDB
@@ -6,6 +6,10 @@ from .models import BaseUser, BaseUserCreate, BaseUserUpdate, BaseGroup, BaseGro
 
 
 class AuthConfigBase(Protocol):
+    auth_tags: Optional[List[str]] = None
+    user_tags: Optional[List[str]] = None
+    group_tags: Optional[List[str]] = None
+
     User: Type[schemas.BaseUser] = BaseUser
     UserRead: Type[schemas.BaseUser] = BaseUser
     UserCreate: Type[schemas.BaseUserCreate] = BaseUserCreate

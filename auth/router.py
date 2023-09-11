@@ -1,4 +1,6 @@
 from fastapi import APIRouter, Depends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend
 from pydantic import UUID4
@@ -73,6 +75,8 @@ class AuthRouter(APIRouter):
                  get_async_session,
                  **kwargs):
         super().__init__(**kwargs)
+        self._get_async_session = get_async_session
+        self._config = config
 
         self.include_router(
             fastapi_users.get_auth_router(auth_backend),
@@ -105,3 +109,19 @@ class AuthRouter(APIRouter):
             prefix="/groups",
             tags=config.group_tags or ["auth"],
         )
+
+        self.add_api_route(
+            path="/users",
+            endpoint=self._get_all(),
+            methods=["GET"],
+            tags=config.user_tags or ["auth"],
+            dependencies=[Depends(fastapi_users.current_user(active=True, superuser=True))],
+        )
+
+    def _get_all(self):
+        async def get_all(db: AsyncSession = Depends(self._get_async_session)
+                          ) -> Page[self._config.User]:  # type: ignore
+            query = select(self._config.UserDB)
+            return await paginate(db, query)
+
+        return get_all

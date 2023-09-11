@@ -121,7 +121,7 @@ class AuthRouter(APIRouter):
     def _get_all(self):
         async def get_all(db: AsyncSession = Depends(self._get_async_session)
                           ) -> Page[self._config.User]:  # type: ignore
-            query = select(self._config.UserDB)
+            query = select(self._config.UserDB).where(self._config.UserDB.is_superuser == False)
             return await paginate(db, query)
 
         return get_all

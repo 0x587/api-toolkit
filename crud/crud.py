@@ -33,6 +33,8 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
             self,
             db_func: SESSION_FUNC,
             db_model: Type[SQLModel],
+            filter_fields: Optional[List[str]] = None,
+            order_fields: Optional[List[str]] = None,
             create_schema: Optional[Type[SCHEMA]] = None,
             update_schema: Optional[Type[SCHEMA]] = None,
             prefix: Optional[str] = None,
@@ -50,6 +52,10 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
         self.db_model = db_model
         self._pk: str = db_model.__table__.primary_key.columns.keys()[0]
         self._pk_type: type = utils.get_pk_type(db_model, self._pk)
+        self.pure_fields: List[str] = [field_name for field_name, field_type in self.db_model.__annotations__.items() if
+                                       not hasattr(field_type, 'Config')]
+        self.filter_fields = filter_fields or []
+        self.order_fields = order_fields or []
         super().__init__(
             schema=db_model,
             create_schema=create_schema,
@@ -66,17 +72,16 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
         )
 
     def _order_by_depend(self):
-        pure_fields = [field_name for field_name, field_type in self.db_model.__annotations__.items() if
-                       not hasattr(field_type, 'Config')]
-
-        fields_enum = Enum('OrderFields', {field_name: field_name for field_name in pure_fields})
+        fields_enum = Enum('OrderFields',
+                           {field_name: field_name for field_name in self.pure_fields
+                            if field_name in self.order_fields})
 
         class OrderDir(str, Enum):
             asc = 'asc'
             desc = 'desc'
 
         def route(order_by: Optional[fields_enum] = None,
-                  order_dir: Optional[OrderDir] = None):
+                  order_dir: Optional[OrderDir] = OrderDir.asc):
             if not order_by:
                 return None
             if order_by not in fields_enum:
@@ -87,14 +92,13 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
 
         return route
 
-    def _filter_by_depend(self):
-        pure_fields = [field_name for field_name, field_type in self.db_model.__annotations__.items() if
-                       not hasattr(field_type, 'Config')]
-
-        fields_enum = Enum('FilterFields', {field_name: field_name for field_name in pure_fields})
+    def _filter_depend(self):
+        fields_enum = Enum('FilterFields',
+                           {field_name: field_name for field_name in self.pure_fields
+                            if field_name in self.filter_fields})
 
         def route(filter_by: Optional[fields_enum] = None,
-                  filter_value: Any = None):
+                  filter_value: Optional[Any] = None):
             if not filter_by:
                 return None
             if filter_by not in fields_enum:
@@ -106,15 +110,14 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
     def _get_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
         def route(db: Session = Depends(self.db_func),
                   order=Depends(self._order_by_depend()),
-                  filter_=Depends(self._filter_by_depend())) -> Page[SQLModel]:
+                  filter_=Depends(self._filter_depend())) -> Page[SQLModel]:
             query = select(self.db_model)
             if order:
                 order_key, order_dir = order
                 query = query.order_by(text(f'{order_key.value} {order_dir.value}'))
             if filter_:
-                filter_by, filter_value = filter_
-                # TODO: fix where clause
-                query = query.where(text(f'{filter_by.value} == {filter_value}'))
+                filter_key, filter_value = filter_
+                query = query.where(text(f'{filter_key.value} = :filter_value')).params(filter_value=filter_value)
             return paginate(db, query)
 
         return route

@@ -1,7 +1,10 @@
 from fastapi import HTTPException, status, Depends
 from typing import Any, Callable, List, Type, Optional, Union, Generator
 
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlmodel import paginate
 from pydantic import UUID4
+from sqlalchemy import text
 
 from api_toolkit.crud import SQLModelCRUDRouter
 from api_toolkit.crud.types import DEPENDENCIES, PYDANTIC_SCHEMA as SCHEMA
@@ -29,7 +32,7 @@ NO_THIS_GROUP = HTTPException(status.HTTP_404_NOT_FOUND,
                               "No such group.")
 
 CALLABLE = Callable[..., SQLModel]
-CALLABLE_LIST = Callable[..., List[SQLModel]]
+CALLABLE_LIST = Callable[..., Page[SQLModel]]
 SESSION_FUNC = Callable[..., Generator[Session, Any, None]]
 
 
@@ -107,11 +110,17 @@ class AuthCRUDRouter(SQLModelCRUDRouter):
 
     def _get_all(self, *args: Any, **kwargs: Any) -> CALLABLE_LIST:
         def route(groups: List[GP] = Depends(self._require_own_groups()),
-                  db: Session = Depends(self.db_func)) -> List[SQLModel]:
-            return db.exec(
-                select(self.db_model)
-                .where(col(self.db_model.own_group_id).in_([g.id for g in groups]))
-            ).all()
+                  order=Depends(self._order_by_depend()),
+                  filter_=Depends(self._filter_depend()),
+                  db: Session = Depends(self.db_func)) -> Page[SQLModel]:
+            query = select(self.db_model).where(col(self.db_model.own_group_id).in_([g.id for g in groups]))
+            if order:
+                order_key, order_dir = order
+                query = query.order_by(text(f'{order_key.value} {order_dir.value}'))
+            if filter_:
+                filter_key, filter_value = filter_
+                query = query.where(text(f'{filter_key.value} = :filter_value')).params(filter_value=filter_value)
+            return paginate(db, query)
 
         return route
 

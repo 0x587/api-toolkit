@@ -72,16 +72,14 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
         )
 
     def _order_by_depend(self):
-        fields_enum = Enum('OrderFields',
+        fields_enum = Enum(f'{self.db_model.__name__}OrderFields',
                            {field_name: field_name for field_name in self.pure_fields
                             if field_name in self.order_fields})
 
-        class OrderDir(str, Enum):
-            asc = 'asc'
-            desc = 'desc'
+        order_dir_enum = Enum(f'{self.db_model.__name__}OrderDir', {'asc': 'asc', 'desc': 'desc'})
 
         def route(order_by: Optional[fields_enum] = None,
-                  order_dir: Optional[OrderDir] = OrderDir.asc):
+                  order_dir: Optional[order_dir_enum] = order_dir_enum('asc')):
             if not order_by:
                 return None
             if order_by not in fields_enum:
@@ -93,7 +91,7 @@ class SQLModelCRUDRouter(CRUDGenerator[SCHEMA]):
         return route
 
     def _filter_depend(self):
-        fields_enum = Enum('FilterFields',
+        fields_enum = Enum(f'{self.db_model.__name__}FilterFields',
                            {field_name: field_name for field_name in self.pure_fields
                             if field_name in self.filter_fields})
 

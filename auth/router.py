@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from fastapi_users import FastAPIUsers
@@ -33,6 +33,14 @@ class GroupRouter(APIRouter):
         )
 
         self.add_api_route(
+            path="/{group_id}",
+            endpoint=self._get_one(),
+            methods=["GET"],
+            tags=config.group_tags or ["auth"],
+            dependencies=[Depends(fastapi_users.current_user(active=True, superuser=True))],
+        )
+
+        self.add_api_route(
             path="/register",
             endpoint=self._register(),
             methods=["POST"],
@@ -46,10 +54,22 @@ class GroupRouter(APIRouter):
 
         return get_all
 
+    def _get_one(self):
+        async def get_one(group_id: UUID4,
+                          db: AsyncSession = Depends(self._get_async_session)):
+            group = await db.get(self._config.GroupDB, group_id)
+            if group:
+                return group
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
+
+        return get_one
+
     def _delete(self):
         async def delete(group_id: UUID4,
                          db: AsyncSession = Depends(self._get_async_session)):
             group = await db.get(self._config.GroupDB, group_id)
+            if not group:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Group not found")
             await db.delete(group)
             await db.commit()
             return group

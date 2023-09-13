@@ -56,7 +56,7 @@ class BaseGroup(SQLModel):
     id: UUID4
     name: str
     is_active: bool = True
-    parent_id: UUID4
+    parent_id: Optional[UUID4]
     created_at: datetime
 
 

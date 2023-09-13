@@ -33,6 +33,7 @@ GP = TypeVar("GP", bound=GroupProtocol)
 # <editor-fold desc="User Model">
 
 class BaseUser(schemas.BaseUser):
+    group_id: Optional[UUID4]
     created_at: datetime
 
 

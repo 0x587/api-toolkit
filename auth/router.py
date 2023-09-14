@@ -21,7 +21,7 @@ class GroupRouter(APIRouter):
             endpoint=self._get_all(),
             methods=["GET"],
             tags=config.group_tags or ["auth"],
-            dependencies=[Depends(fastapi_users.current_user(active=True, superuser=True))],
+            dependencies=[Depends(fastapi_users.current_user(active=True))],
         )
 
         self.add_api_route(
@@ -29,7 +29,7 @@ class GroupRouter(APIRouter):
             endpoint=self._delete(),
             methods=["DELETE"],
             tags=config.group_tags or ["auth"],
-            dependencies=[Depends(fastapi_users.current_user(active=True, superuser=True))],
+            dependencies=[Depends(fastapi_users.current_user(active=True))],
         )
 
         self.add_api_route(
@@ -37,7 +37,7 @@ class GroupRouter(APIRouter):
             endpoint=self._get_one(),
             methods=["GET"],
             tags=config.group_tags or ["auth"],
-            dependencies=[Depends(fastapi_users.current_user(active=True, superuser=True))],
+            dependencies=[Depends(fastapi_users.current_user(active=True))],
         )
 
         self.add_api_route(

@@ -1,10 +1,12 @@
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlmodel import paginate
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend
 from pydantic import UUID4
-from sqlmodel import select
+from sqlmodel import select, col
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from .config import AuthConfigBase
@@ -139,9 +141,12 @@ class AuthRouter(APIRouter):
         )
 
     def _get_all(self):
-        async def get_all(db: AsyncSession = Depends(self._get_async_session)
+        async def get_all(db: AsyncSession = Depends(self._get_async_session),
+                          username: Optional[str] = None,
                           ) -> Page[self._config.User]:  # type: ignore
             query = select(self._config.UserDB).where(self._config.UserDB.is_superuser == False)
+            if username:
+                query = query.where(col(self._config.UserDB.email).like(f'%{username}%'))
             return await paginate(db, query)
 
         return get_all

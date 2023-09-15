@@ -146,7 +146,9 @@ class AuthRouter(APIRouter):
                           ) -> Page[self._config.User]:  # type: ignore
             query = select(self._config.UserDB).where(self._config.UserDB.is_superuser == False)
             if username:
-                query = query.where(col(self._config.UserDB.email).like(f'%{username}%'))
+                query = query.where(col(self._config.UserDB.email).like(f'%{username}%').__or__(
+                    col(self._config.UserDB.username).like(f'%{username}%')
+                ))
             return await paginate(db, query)
 
         return get_all

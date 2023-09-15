@@ -1,5 +1,6 @@
-from typing import TypeVar, Generic, Protocol
-from sqlalchemy.orm import DeclarativeMeta
+from typing import TypeVar
+from sqlalchemy.orm import Session
 
-T = TypeVar("T")
-DB_MODEL = TypeVar("DB_MODEL", bound=DeclarativeMeta)
+PK_TYPE = TypeVar("PK_TYPE")
+DB_MODEL = TypeVar("DB_MODEL")
+DataBaseProtocol = TypeVar("DataBaseProtocol", bound=Session)

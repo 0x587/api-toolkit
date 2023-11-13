@@ -23,6 +23,12 @@ class RateeDB(MappedAsDataclass, ORMBase):
         'RateRecordDB', back_populates='ratee', default_factory=list)
 
 
+class RateeSchema(BaseModel):
+    id: UUID4
+    name: str
+    sex: Sex
+
+
 class ProjectDB(MappedAsDataclass, ORMBase):
     __tablename__ = 'project'
 
@@ -50,3 +56,11 @@ class RateRecordDB(MappedAsDataclass, ORMBase):
         ProjectDB, back_populates='rate_records', default=None)
 
     value: Mapped[float] = mapped_column(default=0.0)
+
+
+class RateRecordSchema(BaseModel):
+    value: float
+    ratee_id: UUID4
+    ratee: RateeSchema
+    project_id: UUID4
+    project: ProjectSchema

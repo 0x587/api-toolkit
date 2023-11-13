@@ -1,10 +1,10 @@
 import uuid
 from enum import IntEnum
-from pydantic import UUID4
+from pydantic import UUID4, BaseModel
 from sqlalchemy import String, Enum, UUID, ForeignKey
-from sqlalchemy.orm import relationship, MappedAsDataclass
+from sqlalchemy.orm import relationship, MappedAsDataclass, Mapped, mapped_column
 
-from api_toolkit.orm import Base, Mapped, mapped_column
+from api_toolkit.orm import ORMBase
 
 
 class Sex(IntEnum):
@@ -12,7 +12,7 @@ class Sex(IntEnum):
     Female = 1
 
 
-class RateeDB(MappedAsDataclass, Base):
+class RateeDB(MappedAsDataclass, ORMBase):
     __tablename__ = 'ratee'
 
     id: Mapped[UUID4] = mapped_column(UUID, primary_key=True, default_factory=uuid.uuid4)
@@ -23,7 +23,7 @@ class RateeDB(MappedAsDataclass, Base):
         'RateRecordDB', back_populates='ratee', default_factory=list)
 
 
-class ProjectDB(MappedAsDataclass, Base):
+class ProjectDB(MappedAsDataclass, ORMBase):
     __tablename__ = 'project'
 
     id: Mapped[UUID4] = mapped_column(UUID, primary_key=True, default_factory=uuid.uuid4)
@@ -33,7 +33,12 @@ class ProjectDB(MappedAsDataclass, Base):
         'RateRecordDB', back_populates='project', default_factory=list)
 
 
-class RateRecordDB(MappedAsDataclass, Base):
+class ProjectSchema(BaseModel):
+    id: UUID4
+    name: str
+
+
+class RateRecordDB(MappedAsDataclass, ORMBase):
     __tablename__ = 'rate_record'
 
     ratee_id: Mapped[UUID4] = mapped_column(ForeignKey(RateeDB.id), primary_key=True, default=None)

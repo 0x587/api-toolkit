@@ -3,6 +3,7 @@ from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 
 from ._base import BaseORM
+from ._types import DB_MODEL, DataBaseProtocol
 
 
 class Base(DeclarativeBase):
@@ -13,5 +14,7 @@ __all__ = [
     "Base",
     "Mapped",
     "mapped_column",
-    "BaseORM"
+    "DataBaseProtocol",
+    "BaseORM",
+    "DB_MODEL",
 ]

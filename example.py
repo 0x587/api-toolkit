@@ -25,25 +25,37 @@ rate_record_orm = BaseORM(next(get_db()), RateRecordDB)
 
 db = next(get_db())
 
-stmt = (
-    select(func.min(RateeDB.name).label('ratee_name'),
-           func.min(ProjectDB.name).label('project_name'),
-           func.avg(RateRecordDB.value).label('value'))
-    .group_by(RateRecordDB.ratee_id, RateRecordDB.project_id)
-    .join(RateeDB)
-    .join(ProjectDB)
-)
+Project = BaseORM(db, ProjectDB)
 
+projects = db.scalars(Project.get_all_query()).all()
 
-print(stmt)
+print(db.scalar(Project.get_one_query(projects[0].id)))
 
-for row in db.execute(stmt):
-    print(RateRecordDetail(**row._mapping))
-    # print(RateRecordDetail.model_validate(**dict(row)))
+p = ProjectDB(name='TestProject')
+Project.create(p)
+
+# stmt = (
+#     select(func.min(RateeDB.name).label('ratee_name'),
+#            func.min(ProjectDB.name).label('project_name'),
+#            func.avg(RateRecordDB.value).label('value'))
+#     .group_by(RateRecordDB.ratee_id, RateRecordDB.project_id)
+#     .join(RateeDB)
+#     .join(ProjectDB)
+# )
+
+# stmt = select(RateeDB)
+
+# print(db.scalars(select(RateeDB.id)).first())
+# print(db.scalars(select(RateeDB.id, RateeDB.name)).first())
+# print(stmt)
+#
+# for row in db.execute(stmt).mappings():
+#     print(row)
+# print(RateRecordDetail(**row))
 
 # print(RateRecordDetail.from_orm(**records[0].__dict__))
 
-app = FastAPI()
+# app = FastAPI()
 
 # run app
 # uvicorn.run(app)

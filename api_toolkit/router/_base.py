@@ -1,19 +1,27 @@
-from abc import abstractmethod, ABC
-from typing import Generic, Type, Sequence, Any, Callable, Union
+from typing import Generic, Type, Sequence, Any, Callable, Union, Generator, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Depends
 
+from api_toolkit.orm import DB_MODEL, BaseORM, DataBaseProtocol
 from api_toolkit.router._types import DEPENDENCIES
 from api_toolkit.view import ORM_MODEL
+import api_toolkit.router._utils as utils
+
+NOT_FOUND = HTTPException(404, "Item not found")
 
 
-class CRUDBase(Generic[ORM_MODEL], APIRouter, ABC):
+class CRUDBase(Generic[ORM_MODEL], APIRouter):
     schema: Type[ORM_MODEL]
     create_schema: Type[ORM_MODEL]
     update_schema: Type[ORM_MODEL]
 
     def __init__(
             self,
+            db_func: Callable[..., Generator[DataBaseProtocol, Any, None]],
+            model: Type[DB_MODEL],
+            schema: Type[ORM_MODEL],
+            create_schema: Optional[Type[ORM_MODEL]] = None,
+            update_schema: Optional[Type[ORM_MODEL]] = None,
             get_all_route: Union[bool, DEPENDENCIES] = True,
             get_one_route: Union[bool, DEPENDENCIES] = True,
             create_one_route: Union[bool, DEPENDENCIES] = True,
@@ -23,6 +31,18 @@ class CRUDBase(Generic[ORM_MODEL], APIRouter, ABC):
             delete_all_route: Union[bool, DEPENDENCIES] = True,
     ):
         super().__init__()
+        self.db_func = db_func
+        self.model = model
+        self.schema = schema
+        self.create_schema = create_schema or schema
+        self.update_schema = update_schema or schema
+        self.orm = BaseORM(Depends(db_func), model)
+        assert len(schema.__table__.primary_key.columns) == 1, (
+            'CRUD operations are only supported for models with a single primary key.'
+        )
+        self._pk: str = schema.__table__.primary_key.columns.keys()[0]
+        self._pk_type: type = utils.get_pk_type(schema, self._pk)
+
         if get_all_route:
             self.add_api_route(
                 '/get_all',
@@ -73,30 +93,47 @@ class CRUDBase(Generic[ORM_MODEL], APIRouter, ABC):
                 dependencies=delete_all_route if isinstance(delete_all_route, Sequence) else None,
             )
 
-    @abstractmethod
     def _get_all(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
-        raise NotImplementedError
+        def route(db: DataBaseProtocol = Depends(self.db_func)):
+            return db.scalars(self.orm.get_all_query()).all()
 
-    @abstractmethod
+        return route
+
     def _get_one(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
-        raise NotImplementedError
+        def route(ident: self._pk_type,  # type: ignore
+                  db: DataBaseProtocol = Depends(self.db_func)):
+            return db.scalar(self.orm.get_one_query(ident))
 
-    @abstractmethod
+        return route
+
     def _create_one(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
-        raise NotImplementedError
+        def route(data: self.create_schema):  # type: ignore
+            return self.orm.create(data)
 
-    @abstractmethod
+        return route
+
     def _create_some(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
-        raise NotImplementedError
+        def route(data: self.create_schema):  # type: ignore
+            return self.orm.create_some(data)
 
-    @abstractmethod
+        return route
+
     def _update(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
-        raise NotImplementedError
+        def route(ident: self._pk_type,  # type: ignore
+                  model: self.update_schema,  # type: ignore
+                  ):
+            return self.orm.update(ident, **model.dict())
 
-    @abstractmethod
+        return route
+
     def _delete_one(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
-        raise NotImplementedError
+        def route(ident: self._pk_type):  # type: ignore
+            return self.orm.delete_one(ident)
 
-    @abstractmethod
+        return route
+
     def _delete_all(self, *args: Any, **kwargs: Any) -> Callable[..., Any]:
-        raise NotImplementedError
+        def route():
+            return self.orm.delete_all()
+
+        return route

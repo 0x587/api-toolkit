@@ -23,16 +23,16 @@ rate_record_orm = BaseORM(next(get_db()), RateRecordDB)
 # print(Ratee(**r.__dict__))
 # print(rate_record_orm.get_one(('8c621d20-c0c6-4cb2-99d4-389d614c5020', 'ed6d60fd-da19-470a-9aef-64ba9fa7b1e2')))
 
-db = next(get_db())
+# db = next(get_db())
 
-Project = BaseORM(db, ProjectDB)
+# Project = BaseORM(db, ProjectDB)
 
-projects = db.scalars(Project.get_all_query()).all()
+# projects = db.scalars(Project.get_all_query()).all()
 
-print(db.scalar(Project.get_one_query(projects[0].id)))
+# print(db.scalar(Project.get_one_query(projects[0].id)))
 
-p = ProjectDB(name='TestProject')
-Project.create(p)
+# p = ProjectDB(name='TestProject')
+# Project.create(p)
 
 # stmt = (
 #     select(func.min(RateeDB.name).label('ratee_name'),
@@ -55,7 +55,22 @@ Project.create(p)
 
 # print(RateRecordDetail.from_orm(**records[0].__dict__))
 
-# app = FastAPI()
+from api_toolkit.router import CRUDBase
+
+from pydantic import BaseModel
+
+
+class ProjectSchema(BaseModel):
+    id: UUID4
+    name: str
+
+
+project_router = CRUDBase(
+    get_db,
+    ProjectDB,
+    ProjectSchema)
+
+app = FastAPI()
 
 # run app
-# uvicorn.run(app)
+uvicorn.run(app)

@@ -1,0 +1,35 @@
+import uuid
+from typing import List
+
+import sqlalchemy
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
+from sqlalchemy import ForeignKey
+import datetime
+import enum
+
+
+class Base(DeclarativeBase):
+    pass
+
+{% for model in models %}
+class {{model.name}}(Base):
+    __tablename__ = "{{model.table_name}}"
+    {% for field in model.fields %}
+    {{ field.name }}: Mapped[{{ field.field.python_type_str }}] = mapped_column(
+        {{ field.field.sql_type_str }},
+        {%- if field.field.primary_key -%}primary_key=True, {%- endif -%})
+    {% endfor -%}
+
+    {% for fk in model.fk %}
+    __fk_{{ fk.one_side.snake_name }}_{{ fk.one_side.pk.name }}: Mapped[{{ fk.one_side.pk.field.python_type_str }}] = mapped_column(ForeignKey("{{fk.one_side.table_name}}.{{ fk.one_side.pk.name }}"))
+    {%- endfor -%}
+
+    {% for relation in model.relationship %}
+    {% if relation.type == 'one' -%}
+    relation_one_{{ relation.target.snake_name }}: Mapped["{{ relation.target.name }}"] = relationship("{{ relation.target.name }}",back_populates="relation_many_{{model.snake_name}}")
+    {%- else -%}
+    relation_many_{{ relation.target.snake_name }}: Mapped[List["{{ relation.target.name }}"]] = relationship("{{ relation.target.name }}",back_populates="relation_one_{{model.snake_name}}")
+    {%- endif -%}
+    {% endfor %}
+
+{% endfor %}

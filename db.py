@@ -4,7 +4,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import Session
 
-with open('example.config.yaml', 'r') as file:
+with open('config.yaml', 'r') as file:
     config_data = yaml.safe_load(file)
     user = config_data['database']['user']
     password = config_data['database']['password']

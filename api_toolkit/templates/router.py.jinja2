@@ -1,0 +1,92 @@
+{%- set name = model.name -%}
+{%- set s_name = model.snake_name -%}
+{%- set base_schema = model.base_schema_name -%}
+{%- set router = s_name + "_router" -%}
+{%- set pk_type = model.pk.field.python_type_str -%}
+
+from typing import List, Optional
+from fastapi import APIRouter, Depends
+import uuid
+import datetime
+from ..db import get_db
+from ..models import {{ name }}
+from ..schemas import {{ base_schema }}
+from ..schemas import{% for c in model.relationship_combinations %} {{ base_schema }}With{{ c.name }}{% if loop.revindex0 %},{% endif %}{% endfor %}
+
+{{ router }} = APIRouter(
+    prefix="/{{ s_name }}",
+    tags=["{{ name }}"])
+
+@{{ router }}.post("/create")
+def create(
+        {%- for field in model.fields -%}
+        {%- if not field.field.primary_key -%}
+        {{field.name}}: {{field.field.python_type_str}},
+        {%- endif -%}
+        {% endfor -%}
+        db=Depends(get_db)) -> {{ base_schema }}:
+    model = {}
+    {% for field in model.fields %}
+    {%- if not field.field.primary_key -%}
+    if {{field.name}} is not None:
+        model["{{field.name}}"] = {{field.name}}
+    {% endif -%}
+    {%- endfor %}
+    model = {{ base_schema }}(**model)
+    model = {{ name }}(**model.model_dump())
+    db.add(model)
+    db.commit()
+    db.refresh(model)
+    return model
+
+@{{ router }}.put("/update")
+def update(ident: {{ pk_type }},
+        {%- for field in model.fields -%}
+        {%- if not field.field.primary_key -%}
+        {{field.name}}: Optional[{{field.field.python_type_str}}] = None,
+        {%- endif -%}
+        {% endfor -%}
+        db=Depends(get_db)) -> {{ base_schema }}:
+    model = db.get({{ name }}, ident)
+    {% for field in model.fields %}
+    {%- if not field.field.primary_key -%}
+    if {{field.name}} is not None:
+        model.{{field.name}} = {{field.name}}
+    {% endif -%}
+    {%- endfor %}
+    db.commit()
+    db.refresh(model)
+    return model
+
+@{{ router }}.get("/get_all")
+def get_all(db=Depends(get_db)) -> List[{{ base_schema }}]:
+    return db.query({{ name }}).all()
+
+{% for combination in model.relationship_combinations %}
+@{{ router }}.get("/get_all_with_{{ combination.snake_name }}")
+def get_all_with_{{ combination.snake_name }}(db=Depends(get_db)) -> List[{{ base_schema }}With{{ combination.name }}]:
+    return db.query({{ name }}).all()
+{% endfor %}
+
+@{{ router }}.get("/get_one")
+def get_one(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ base_schema }}:
+    return db.get({{ name }}, ident)
+
+{% for combination in model.relationship_combinations %}
+@{{ router }}.get("/get_one_with_{{ combination.snake_name }}")
+def get_one_with_{{ combination.snake_name }}(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ base_schema }}With{{ combination.name }}:
+    return db.get({{ name }}, ident)
+{% endfor %}
+
+@{{ router }}.delete("/delete_one")
+def delete_one(ident: {{ pk_type }}, db=Depends(get_db)):
+    db.delete({{ name }}, ident)
+    db.commit()
+    return {"message": "deleted"}
+
+
+@{{ router }}.delete("/delete_all")
+def delete_all(db=Depends(get_db)):
+    db.query({{ name }}).delete()
+    db.commit()
+    return {"message": "deleted"}

@@ -1,0 +1,10 @@
+{% for model in models %}
+from .{{ model.snake_name }} import {{ model.snake_name }}_router
+{%- endfor %}
+
+__all__ = [
+    {%- for model in models %}
+    "{{ model.snake_name }}_router",
+    {%- endfor %}
+]
+

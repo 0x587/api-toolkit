@@ -1,0 +1,34 @@
+from typing import List
+
+from pydantic import BaseModel, Field
+import uuid
+import datetime
+
+{% for model in models %}
+class {{ model.base_schema_name }}(BaseModel):
+    {% for field in model.fields %}{{field.name}}: {{field.field.python_type_str}} = Field(
+        {%- if field.field.default_str %}default={{field.field.default_str}},{%- endif -%}
+        {%- if field.field.default_factory_str %}default_factory={{field.field.default_factory_str}},{%- endif -%}
+    )
+    {% endfor %}
+    class Config:
+        from_attributes = True
+
+{% for combination in model.relationship_combinations %}
+class {{ model.base_schema_name }}With{{ combination.name }}({{ model.base_schema_name }}):
+    {%- for relation in combination.combination -%}
+    {% if relation.type == 'one' %}
+    {{ relation.target.snake_name }}: "{{ relation.target.name }}Schema" = Field(alias="relation_one_{{ relation.target.snake_name }}")
+    {% else %}
+    {{ relation.target.snake_plural_name }}: List["{{ relation.target.name }}Schema"] = Field(alias="relation_many_{{ relation.target.snake_name }}")
+    {%- endif -%}
+    {% endfor %}
+{% endfor -%}
+{%- endfor -%}
+
+{%- for model in models -%}
+{% for combination in model.relationship_combinations %}
+{{ model.base_schema_name }}With{{ combination.name }}.model_rebuild()
+{%- endfor -%}
+{% endfor %}
+

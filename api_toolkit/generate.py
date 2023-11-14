@@ -3,8 +3,8 @@ import os
 import re
 from itertools import combinations
 
-from .link import OneManyLink
-from .model import ModelManager
+from api_toolkit.define.link import OneManyLink
+from api_toolkit.define.model import ModelManager
 from typing import Callable, Type, Any, Sequence, Dict
 import hashlib
 from jinja2 import Environment, PackageLoader
@@ -120,11 +120,15 @@ class CodeGenerator:
         template = self.env.get_template('schemas.py.jinja2')
         return template.render(models=self.models.values())
 
+    def generate_db_connect(self):
+        return self.env.get_template('db.py.jinja2').render()
+
     def generate_db_script(self):
         return self.env.get_template('dev.db.py.jinja2').render()
 
     def generate_tables(self):
         self.parse_models(ModelManager)
+        self.generate_file(os.path.join(self.root_path, 'db.py'), self.generate_db_connect)
         self.generate_file(self.models_path, self.define2table)
         self.generate_file(self.schemas_path, self.define2schema)
         self.generate_file(os.path.join(self.dev_path, 'db.py'), self.generate_db_script)

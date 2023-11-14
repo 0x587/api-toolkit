@@ -3,8 +3,8 @@ import os
 import re
 from itertools import combinations
 
-from api_toolkit.define.link import OneManyLink
-from api_toolkit.define.model import ModelManager
+from .define.link import OneManyLink
+from .define.model import ModelManager
 from typing import Callable, Type, Any, Sequence, Dict
 import hashlib
 from jinja2 import Environment, PackageLoader
@@ -32,15 +32,13 @@ def plural(word: str) -> str:
 
 
 class CodeGenerator:
-    root_path = 'inner_code'
-    models_path = os.path.join(root_path, 'models.py')
-    schemas_path = os.path.join(root_path, 'schemas.py')
-    dev_path = os.path.join(root_path, 'dev')
-    routers_path = os.path.join(root_path, 'routers')
+    def __init__(self, root_path='inner_code'):
+        self.root_path = root_path
+        self.models_path = os.path.join(root_path, 'models.py')
+        self.schemas_path = os.path.join(root_path, 'schemas.py')
+        self.dev_path = os.path.join(root_path, 'dev')
+        self.routers_path = os.path.join(root_path, 'routers')
 
-    def __init__(self, root_path=None):
-        if root_path is not None:
-            self.root_path = root_path
         if not os.path.exists(self.root_path):
             os.mkdir(self.root_path)
         if not os.path.exists(self.dev_path):

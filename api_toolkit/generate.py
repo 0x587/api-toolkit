@@ -38,7 +38,9 @@ class CodeGenerator:
     dev_path = os.path.join(root_path, 'dev')
     routers_path = os.path.join(root_path, 'routers')
 
-    def __init__(self):
+    def __init__(self, root_path=None):
+        if root_path is not None:
+            self.root_path = root_path
         if not os.path.exists(self.root_path):
             os.mkdir(self.root_path)
         if not os.path.exists(self.dev_path):

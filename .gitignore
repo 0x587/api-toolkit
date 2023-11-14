@@ -3,6 +3,7 @@
 sqlite.db
 inner_code/
 *config.yaml
+.venv/
 
 alembic.ini
 alembic/

@@ -6,6 +6,8 @@
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
 import uuid
 import datetime
 from ..db import get_db
@@ -72,8 +74,8 @@ def update(ident: {{ pk_type }},
 )
 
 
-def get_all(db=Depends(get_db)) -> List[{{ base_schema }}]:
-    return db.query({{ name }}).all()
+def get_all(db=Depends(get_db)) -> Page[{{ base_schema }}]:
+    return paginate(db.query({{ name }}))
 
 {{ router }}.add_api_route(
     path="/get_all",
@@ -83,8 +85,8 @@ def get_all(db=Depends(get_db)) -> List[{{ base_schema }}]:
 
 
 {% for combination in model.relationship_combinations %}
-def get_all_with_{{ combination.snake_name }}(db=Depends(get_db)) -> List[{{ base_schema }}With{{ combination.name }}]:
-    return db.query({{ name }}).all()
+def get_all_with_{{ combination.snake_name }}(db=Depends(get_db)) -> Page[{{ base_schema }}With{{ combination.name }}]:
+    return paginate(db.query({{ name }}))
 
 
 {{ router }}.add_api_route(

@@ -11,25 +11,35 @@ import enum
 class Base(DeclarativeBase):
     pass
 
-{% for model in models %}
-class {{model.name}}(Base):
-    __tablename__ = "{{model.table_name}}"
-    {% for field in model.fields %}
-    {{ field.name }}: Mapped[{{ field.field.python_type_str }}] = mapped_column(
-        {{ field.field.sql_type_str }},
-        {%- if field.field.primary_key -%}primary_key=True, {%- endif -%})
+{% for name, metadata in models.items() %}
+class {{ name }}(Base):
+    __tablename__ = "{{ metadata.table_name }}"
+    """pk"""
+    {%- for field_name, field in metadata.pk.items() %}
+    {{ field_name }}: Mapped[{{ field.python_type_str }}] = mapped_column({{ field.sql_type_str }}, primary_key=True)
     {% endfor -%}
+    """"""
 
-    {% for fk in model.fk %}
-    __fk_{{ fk.one_side.snake_name }}_{{ fk.one_side.pk.name }}: Mapped[{{ fk.one_side.pk.field.python_type_str }}] = mapped_column(ForeignKey("{{fk.one_side.table_name}}.{{ fk.one_side.pk.name }}"))
-    {%- endfor -%}
+    """fields"""
+    {%- for field_name, field in metadata.fields.items() %}
+    {{ field_name }}: Mapped[{{ field.python_type_str }}] = mapped_column({{ field.sql_type_str }})
+    {% endfor -%}
+    """"""
 
-    {% for relation in model.relationship %}
-    {% if relation.type == 'one' -%}
-    relation_one_{{ relation.target.snake_name }}: Mapped["{{ relation.target.name }}"] = relationship("{{ relation.target.name }}",back_populates="relation_many_{{model.snake_name}}")
+    """fk"""
+    {%- for fk_name, fk in metadata.fk.items() %}
+    {{ fk_name }}: Mapped[{{ fk.field.python_type_str }}] = mapped_column(ForeignKey("{{fk.other_model.table_name}}.{{ fk.other_model.require_one_pk()[0] }}"))
+    {% endfor -%}
+    """"""
+
+    """relationship"""
+    {%- for relation in metadata.relationship %}
+    {% if relation.side == 'one' -%}
+    relation_one_{{ relation.target.snake_name }}: Mapped["{{ relation.target.name }}"] = relationship("{{ relation.target.name }}", back_populates="relation_many_{{metadata.snake_name}}")
     {%- else -%}
-    relation_many_{{ relation.target.snake_name }}: Mapped[List["{{ relation.target.name }}"]] = relationship("{{ relation.target.name }}",back_populates="relation_one_{{model.snake_name}}")
-    {%- endif -%}
-    {% endfor %}
+    relation_many_{{ relation.target.snake_name }}: Mapped[List["{{ relation.target.name }}"]] = relationship("{{ relation.target.name }}", back_populates="relation_one_{{metadata.snake_name}}")
+    {%- endif %}
+    {% endfor -%}
+    """"""
 
 {% endfor %}

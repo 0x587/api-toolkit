@@ -2,14 +2,61 @@ import datetime
 import os
 import re
 from itertools import combinations
+from enum import StrEnum
 
-from .define.link import OneManyLink
-from .define.model import ModelManager
-from typing import Callable, Type, Any, Sequence, Dict
+from ..define.link import OneManyLink, Link
+from ..define.model import ModelManager, Field
+from typing import Callable, Type, Any, Sequence, Dict, List
 import hashlib
 from jinja2 import Environment, PackageLoader
 
 GENERATE_FUNC = Callable[[Any, ...], str]
+
+FIELD_NAME = str
+
+
+class ModelMetadata:
+    def __init__(self,
+                 name: str,
+                 fields: Dict[str, Field],
+                 ):
+        self.name: str = name
+        self.plural_name: str = plural(name)
+        self.snake_name: str = name_convert_to_snake(name)
+        self.snake_plural_name: str = plural(self.snake_name)
+        self.table_name: str = '__table_name_' + self.snake_name
+        self.base_schema_name: str = name + 'Schema'
+
+        self.fields: Dict[FIELD_NAME, Field] = {name: field for name, field in fields.items() if not field.primary_key}
+        self.pk: Dict[FIELD_NAME, Field] = {name: field for name, field in fields.items() if field.primary_key}
+        # { fk_name: pk in other table}
+        self.fk: Dict[FIELD_NAME, FKMetadata] = {}
+
+        self.relationship: List[RelationshipMetadata] = []
+
+    def require_one_pk(self):
+        assert len(self.pk) == 1, f"model <{self.name}> must have only one pk"
+        return list(self.pk.items())[0]
+
+
+class RelationshipSide(StrEnum):
+    one = 'one'
+    many = 'many'
+
+
+class RelationshipMetadata:
+    def __init__(self,
+                 target: ModelMetadata,
+                 side: RelationshipSide,
+                 ):
+        self.target: ModelMetadata = target
+        self.type: RelationshipSide = side
+
+
+class FKMetadata:
+    def __init__(self, field: Field, other_model: ModelMetadata):
+        self.field = field
+        self.other_model = other_model
 
 
 def name_convert_to_snake(name: str) -> str:
@@ -47,9 +94,10 @@ class CodeGenerator:
             os.mkdir(self.routers_path)
         self.env = Environment(loader=PackageLoader('api_toolkit', 'templates'))
         self.models = {}
+        self.model_metadata: Dict[str, ModelMetadata] = {}
 
     @staticmethod
-    def generate_file(path, func: GENERATE_FUNC, **kwargs):
+    def _generate_file(path, func: GENERATE_FUNC, **kwargs):
         content = func(**kwargs)
         content_hash = hashlib.md5(content.encode('utf8')).hexdigest()
         if os.path.exists(path):
@@ -67,7 +115,8 @@ class CodeGenerator:
                     f'"""\n')
             f.write(content)
 
-    def parse_models(self, mm: Type[ModelManager]):
+    def parse_models(self):
+        mm = ModelManager
         models = {}
         for name, info in mm.models.items():
             model = {'name': name,
@@ -84,15 +133,29 @@ class CodeGenerator:
                      }
 
             models[name] = model
-        for left, info in mm.models.items():
+            self.model_metadata[name] = ModelMetadata(name, {f['name']: f['field'] for f in info.fields})
+        for left_name, info in mm.models.items():
             if not info.links:
                 continue
             for link in info.links:
                 if isinstance(link, OneManyLink):
-                    right = link.many
-                    models[right]['fk'].append({'one_side': models[left]})
-                    models[left]['relationship'].append({'target': models[right], 'type': 'many'})
-                    models[right]['relationship'].append({'target': models[left], 'type': 'one'})
+                    right_name = link.many
+                    models[right_name]['fk'].append({'one_side': models[left_name]})
+                    models[left_name]['relationship'].append({'target': models[right_name], 'type': 'many'})
+                    models[right_name]['relationship'].append({'target': models[left_name], 'type': 'one'})
+
+                    other_model = self.model_metadata[left_name]
+                    other_pk_name, other_pk = other_model.require_one_pk()
+                    fk_name = f'__fk__{other_model.snake_name}_{other_pk_name}'
+
+                    self.model_metadata[right_name].fk[fk_name] = FKMetadata(other_pk, other_model)
+                    self.model_metadata[left_name].relationship.append(
+                        RelationshipMetadata(self.model_metadata[right_name], RelationshipSide.many))
+                    self.model_metadata[right_name].relationship.append(
+                        RelationshipMetadata(self.model_metadata[left_name], RelationshipSide.one))
+
+                else:
+                    raise NotImplementedError()
 
         def get_combinations(arr):
             result = []
@@ -112,36 +175,36 @@ class CodeGenerator:
             info['relationship_combinations'] = cbs
         self.models = models
 
-    def define2table(self) -> str:
+    def _define2table(self) -> str:
         template = self.env.get_template('models.py.jinja2')
-        return template.render(models=self.models.values())
+        return template.render(models=self.model_metadata)
 
-    def define2schema(self) -> str:
+    def _define2schema(self) -> str:
         template = self.env.get_template('schemas.py.jinja2')
         return template.render(models=self.models.values())
 
-    def generate_db_connect(self):
+    def _generate_db_connect(self):
         return self.env.get_template('db.py.jinja2').render()
 
-    def generate_db_script(self):
+    def _generate_db_script(self):
         return self.env.get_template('dev.db.py.jinja2').render()
 
     def generate_tables(self):
-        self.parse_models(ModelManager)
-        self.generate_file(os.path.join(self.root_path, 'db.py'), self.generate_db_connect)
-        self.generate_file(self.models_path, self.define2table)
-        self.generate_file(self.schemas_path, self.define2schema)
-        self.generate_file(os.path.join(self.dev_path, 'db.py'), self.generate_db_script)
+        self.parse_models()
+        self._generate_file(os.path.join(self.root_path, 'db.py'), self._generate_db_connect)
+        self._generate_file(self.models_path, self._define2table)
+        self._generate_file(self.schemas_path, self._define2schema)
+        self._generate_file(os.path.join(self.dev_path, 'db.py'), self._generate_db_script)
 
-    def define2router(self, model) -> str:
+    def _define2router(self, model) -> str:
         return self.env.get_template('router.py.jinja2').render(model=model)
 
-    def router_init(self) -> str:
+    def _router_init(self) -> str:
         return self.env.get_template('router_init.py.jinja2').render(models=self.models.values())
 
     def generate_route(self):
         # self.generate_file()
         for model in self.models.values():
-            self.generate_file(os.path.join(self.routers_path, f'{model["snake_name"]}.py'),
-                               self.define2router, model=model)
-        self.generate_file(os.path.join(self.routers_path, '__init__.py'), self.router_init)
+            self._generate_file(os.path.join(self.routers_path, f'{model["snake_name"]}.py'), self._define2router,
+                                model=model)
+        self._generate_file(os.path.join(self.routers_path, '__init__.py'), self._router_init)

@@ -33,6 +33,7 @@ class ModelMetadata:
         self.fk: Dict[FIELD_NAME, FKMetadata] = {}
 
         self.relationship: List[RelationshipMetadata] = []
+        self.relationship_combinations = []
 
     def require_one_pk(self):
         assert len(self.pk) == 1, f"model <{self.name}> must have only one pk"
@@ -173,6 +174,15 @@ class CodeGenerator:
                 'snake_name': '_and_'.join(map(lambda r: name_convert_to_snake(r['target']['name']), cb))
             } for cb in cbs]
             info['relationship_combinations'] = cbs
+        for md in self.model_metadata.values():
+            cbs = get_combinations(md.relationship)
+            cb: Sequence[RelationshipMetadata]
+            cbs = [{
+                'combination': cb,
+                'name': 'And'.join(map(lambda r: r.target.name, cb)),
+                'snake_name': '_and_'.join(map(lambda r: name_convert_to_snake(r.target.name), cb))
+            } for cb in cbs]
+            md.relationship_combinations = cbs
         self.models = models
 
     def _define2table(self) -> str:
@@ -181,7 +191,7 @@ class CodeGenerator:
 
     def _define2schema(self) -> str:
         template = self.env.get_template('schemas.py.jinja2')
-        return template.render(models=self.models.values())
+        return template.render(models=self.model_metadata.values())
 
     def _generate_db_connect(self):
         return self.env.get_template('db.py.jinja2').render()

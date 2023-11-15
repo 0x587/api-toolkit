@@ -2,7 +2,8 @@
 {%- set s_name = model.snake_name -%}
 {%- set base_schema = model.base_schema_name -%}
 {%- set router = s_name + "_router" -%}
-{%- set pk_type = model.pk.field.python_type_str -%}
+{%- set just_one_pk = model.pk|length == 1 -%}
+{%- set pk_type = (model.pk.values()|list)[0].python_type_str -%}
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends
@@ -21,19 +22,15 @@ from ..schemas import{% for c in model.relationship_combinations %} {{ base_sche
 
 
 def create(
-        {%- for field in model.fields -%}
-        {%- if not field.field.primary_key -%}
-        {{field.name}}: {{field.field.python_type_str}},
-        {%- endif -%}
+        {%- for field_name, field in model.fields.items() %}
+        {{ field_name }}: {{ field.python_type_str }},
         {% endfor -%}
         db=Depends(get_db)) -> {{ base_schema }}:
     model = {}
-    {% for field in model.fields %}
-    {%- if not field.field.primary_key -%}
-    if {{field.name}} is not None:
-        model["{{field.name}}"] = {{field.name}}
-    {% endif -%}
-    {%- endfor %}
+    {%- for field_name in model.fields.keys() %}
+    if {{ field_name }} is not None:
+        model["{{ field_name }}"] = {{ field_name }}
+    {% endfor -%}
     model = {{ base_schema }}(**model)
     model = {{ name }}(**model.model_dump())
     db.add(model)
@@ -48,20 +45,17 @@ def create(
     methods=["POST"],
 )
 
+{% if just_one_pk -%}
 def update(ident: {{ pk_type }},
-        {%- for field in model.fields -%}
-        {%- if not field.field.primary_key -%}
-        {{field.name}}: Optional[{{field.field.python_type_str}}] = None,
-        {%- endif -%}
+        {%- for field_name, field in model.fields.items() -%}
+        {{field_name}}: Optional[{{field.python_type_str}}] = None,
         {% endfor -%}
         db=Depends(get_db)) -> {{ base_schema }}:
     model = db.get({{ name }}, ident)
-    {% for field in model.fields %}
-    {%- if not field.field.primary_key -%}
-    if {{field.name}} is not None:
-        model.{{field.name}} = {{field.name}}
-    {% endif -%}
-    {%- endfor %}
+    {%- for field_name, field in model.fields.items() %}
+    if {{field_name}} is not None:
+        model.{{field_name}} = {{field_name}}
+    {% endfor -%}
     db.commit()
     db.refresh(model)
     return model
@@ -72,6 +66,7 @@ def update(ident: {{ pk_type }},
     endpoint=update,
     methods=["PUT"],
 )
+{%- endif %}
 
 
 def get_all(db=Depends(get_db)) -> Page[{{ base_schema }}]:
@@ -96,6 +91,7 @@ def get_all_with_{{ combination.snake_name }}(db=Depends(get_db)) -> Page[{{ bas
 )
 {% endfor %}
 
+{%- if just_one_pk -%}
 def get_one(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ base_schema }}:
     return db.get({{ name }}, ident)
 
@@ -129,6 +125,8 @@ def delete_one(ident: {{ pk_type }}, db=Depends(get_db)):
     endpoint=delete_one,
     methods=["DELETE"],
 )
+{%- endif %}
+
 
 def delete_all(db=Depends(get_db)):
     db.query({{ name }}).delete()

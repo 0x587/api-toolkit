@@ -210,11 +210,10 @@ class CodeGenerator:
         return self.env.get_template('router.py.jinja2').render(model=model)
 
     def _router_init(self) -> str:
-        return self.env.get_template('router_init.py.jinja2').render(models=self.models.values())
+        return self.env.get_template('router_init.py.jinja2').render(models=self.model_metadata.values())
 
     def generate_route(self):
-        # self.generate_file()
-        for model in self.models.values():
-            self._generate_file(os.path.join(self.routers_path, f'{model["snake_name"]}.py'), self._define2router,
+        for model in self.model_metadata.values():
+            self._generate_file(os.path.join(self.routers_path, f'{model.snake_name}.py'), self._define2router,
                                 model=model)
         self._generate_file(os.path.join(self.routers_path, '__init__.py'), self._router_init)

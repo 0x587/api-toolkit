@@ -19,12 +19,15 @@ class CodeGenerator:
         self.models_path = os.path.join(root_path, 'models.py')
         self.schemas_path = os.path.join(root_path, 'schemas.py')
         self.dev_path = os.path.join(root_path, 'dev')
+        self.crud_path = os.path.join(root_path, 'crud')
         self.routers_path = os.path.join(root_path, 'routers')
 
         if not os.path.exists(self.root_path):
             os.mkdir(self.root_path)
         if not os.path.exists(self.dev_path):
             os.mkdir(self.dev_path)
+        if not os.path.exists(self.crud_path):
+            os.mkdir(self.crud_path)
         if not os.path.exists(self.routers_path):
             os.mkdir(self.routers_path)
         self.env = Environment(loader=PackageLoader('api_toolkit', 'templates'))
@@ -114,11 +117,16 @@ class CodeGenerator:
     def _define2router(self, metadata: RouterMetadata) -> str:
         return self.env.get_template('router.py.jinja2').render(metadata=metadata)
 
+    def _define2crud(self, metadata: RouterMetadata) -> str:
+        return self.env.get_template('crud.py.jinja2').render(metadata=metadata)
+
     def _router_init(self) -> str:
         return self.env.get_template('router_init.py.jinja2').render(models=self.model_metadata.values())
 
     def generate_route(self):
         for metadata in self.router_metadata:
-            self._generate_file(os.path.join(self.routers_path, f'{metadata.model.snake_name}.py'), self._define2router,
+            self._generate_file(os.path.join(self.crud_path, f'{metadata.model.snake_name}_crud.py'), self._define2crud,
+                                metadata=metadata)
+            self._generate_file(os.path.join(self.routers_path, f'{metadata.model.snake_name}_router.py'), self._define2router,
                                 metadata=metadata)
         self._generate_file(os.path.join(self.routers_path, '__init__.py'), self._router_init)

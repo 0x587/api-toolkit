@@ -1,5 +1,5 @@
 {% for model in models %}
-from .{{ model.snake_name }} import {{ model.snake_name }}_router
+from .{{ model.snake_name }}_router import {{ model.snake_name }}_router
 {%- endfor %}
 
 __all__ = [

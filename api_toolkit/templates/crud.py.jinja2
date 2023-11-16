@@ -1,0 +1,109 @@
+{%- set name = metadata.model.name -%}
+{%- set s_name = metadata.model.snake_name -%}
+{%- set base_schema = metadata.model.base_schema_name -%}
+{%- set router = s_name + "_router" -%}
+{%- set just_one_pk = metadata.model.pk|length == 1 -%}
+{%- set pk_type = (metadata.model.pk.values()|list)[0].python_type_str -%}
+
+from typing import List, Optional
+from fastapi import Depends
+from fastapi_pagination import Page
+from fastapi_pagination.ext.sqlalchemy import paginate
+import uuid
+import datetime
+from ..db import get_db
+from ..models import *
+from ..schemas import *
+
+# ------------------------Query Routes------------------------
+{% for route in metadata.query_routes() %}
+{%- set schema = base_schema + route.schema_suffix -%}
+{% if route.is_all %}
+def {{ route.name }}(db=Depends(get_db)) -> Page[{{ schema }}]:
+    return paginate(db.query({{ name }}))
+{% elif just_one_pk %}
+def {{ route.name }}(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ schema }}:
+    return db.get({{ name }}, ident)
+{% endif %}
+{% endfor %}
+# -----------------------Create Routes------------------------
+{% for route in metadata.create_routes() %}
+def {{ route.name }}(
+    {%- for field_name, field in metadata.model.fields.items() %}
+    {{ field_name }}: {{ field.python_type_str }},
+    {%- endfor -%}
+    db=Depends(get_db)
+    ) -> {{ base_schema }}:
+    model = {}
+    {%- for field_name in metadata.model.fields.keys() %}
+    if {{ field_name }} is not None:
+        model["{{ field_name }}"] = {{ field_name }}
+    {% endfor -%}
+    model = {{ base_schema }}(**model)
+    model = {{ name }}(**model.model_dump())
+    db.add(model)
+    db.commit()
+    db.refresh(model)
+    return model
+{% endfor %}
+# -----------------------Update Routes------------------------
+{% if just_one_pk %}
+{% for route in metadata.update_routes() %}
+def {{ route.name }}(ident: {{ pk_type }},
+        {%- for field_name, field in metadata.model.fields.items() -%}
+        {{field_name}}: Optional[{{field.python_type_str}}] = None,
+        {% endfor -%}
+        db=Depends(get_db)) -> {{ base_schema }}:
+    model = db.get({{ name }}, ident)
+    {%- for field_name, field in metadata.model.fields.items() %}
+    if {{field_name}} is not None:
+        model.{{field_name}} = {{field_name}}
+    {% endfor -%}
+    db.commit()
+    db.refresh(model)
+    return model
+{% endfor %}
+{% endif %}
+# -----------------------Delete Routes------------------------
+{% for route in metadata.delete_routes() %}
+{% if route.is_all %}
+def {{ route.name }}(db=Depends(get_db)):
+    db.query({{ name }}).delete()
+    db.commit()
+    return {"message": "deleted"}
+{% elif just_one_pk %}
+def {{ route.name }}(ident: {{ pk_type }}, db=Depends(get_db)):
+    db.delete({{ name }}, ident)
+    db.commit()
+    return {"message": "deleted"}
+{% endif %}
+{% endfor %}
+# ----------------------Relation Routes-----------------------
+{% if just_one_pk %}
+{% for route in metadata.relation_routes() %}
+{%- set target = route.relation.target -%}
+{%- set target_just_one_pk = target.pk|length == 1 -%}
+{%- set target_pk_type = (target.pk.values()|list)[0].python_type_str -%}
+{% if target_just_one_pk %}
+def {{ route.name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ target_pk_type }}, db=Depends(get_db)) -> {{ base_schema }}:
+    self: {{ name }} = db.get({{ name }}, ident)
+    target: {{ target.name }} = db.get({{ target.name }}, {{ target.snake_name }}_ident)
+{%- if route.is_delete %}
+    {%- if route.relation.side == 'one' %}
+    self.relation_one_{{ target.snake_name }} = None
+    {% else %}
+    self.relation_many_{{ target.snake_name }}.remove(target)
+    {% endif -%}
+{% else %}
+    {%- if route.relation.side == 'one' %}
+    self.relation_one_{{ target.snake_name }} = target
+    {% else %}
+    self.relation_many_{{ target.snake_name }}.append(target)
+    {% endif -%}
+{%- endif %}
+    db.commit()
+    db.refresh(self)
+    return self
+{% endif %}
+{% endfor %}
+{%- endif -%}

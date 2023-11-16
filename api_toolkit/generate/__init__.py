@@ -94,7 +94,6 @@ class CodeGenerator:
         if not os.path.exists(self.routers_path):
             os.mkdir(self.routers_path)
         self.env = Environment(loader=PackageLoader('api_toolkit', 'templates'))
-        self.models = {}
         self.model_metadata: Dict[str, ModelMetadata] = {}
 
     @staticmethod
@@ -118,22 +117,7 @@ class CodeGenerator:
 
     def parse_models(self):
         mm = ModelManager
-        models = {}
         for name, info in mm.models.items():
-            model = {'name': name,
-                     'plural_name': plural(name),
-                     'snake_name': name_convert_to_snake(name),
-                     'snake_plural_name': plural(name_convert_to_snake(name)),
-                     'table_name': '__table_name_' + name_convert_to_snake(name),
-                     'base_schema_name': name + 'Schema',
-                     'pk': [f for f in info.fields if f['field'].primary_key][0],
-                     'fields': info.fields,
-                     'fk': [],
-                     'relationship': [],
-                     'relationship_combinations': [],
-                     }
-
-            models[name] = model
             self.model_metadata[name] = ModelMetadata(name, {f['name']: f['field'] for f in info.fields})
         for left_name, info in mm.models.items():
             if not info.links:
@@ -141,10 +125,6 @@ class CodeGenerator:
             for link in info.links:
                 if isinstance(link, OneManyLink):
                     right_name = link.many
-                    models[right_name]['fk'].append({'one_side': models[left_name]})
-                    models[left_name]['relationship'].append({'target': models[right_name], 'type': 'many'})
-                    models[right_name]['relationship'].append({'target': models[left_name], 'type': 'one'})
-
                     other_model = self.model_metadata[left_name]
                     other_pk_name, other_pk = other_model.require_one_pk()
                     fk_name = f'__fk__{other_model.snake_name}_{other_pk_name}'
@@ -165,15 +145,6 @@ class CodeGenerator:
                     result.append(combination)
             return result
 
-        for info in models.values():
-            cbs = get_combinations(info['relationship'])
-            cb: Sequence[Dict]
-            cbs = [{
-                'combination': cb,
-                'name': 'And'.join(map(lambda r: r['target']['name'], cb)),
-                'snake_name': '_and_'.join(map(lambda r: name_convert_to_snake(r['target']['name']), cb))
-            } for cb in cbs]
-            info['relationship_combinations'] = cbs
         for md in self.model_metadata.values():
             cbs = get_combinations(md.relationship)
             cb: Sequence[RelationshipMetadata]
@@ -183,7 +154,6 @@ class CodeGenerator:
                 'snake_name': '_and_'.join(map(lambda r: name_convert_to_snake(r.target.name), cb))
             } for cb in cbs]
             md.relationship_combinations = cbs
-        self.models = models
 
     def _define2table(self) -> str:
         template = self.env.get_template('models.py.jinja2')
@@ -200,7 +170,6 @@ class CodeGenerator:
         return self.env.get_template('dev.db.py.jinja2').render()
 
     def generate_tables(self):
-        self.parse_models()
         self._generate_file(os.path.join(self.root_path, 'db.py'), self._generate_db_connect)
         self._generate_file(self.models_path, self._define2table)
         self._generate_file(self.schemas_path, self._define2schema)

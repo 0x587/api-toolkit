@@ -1,9 +1,9 @@
-{%- set name = model.name -%}
-{%- set s_name = model.snake_name -%}
-{%- set base_schema = model.base_schema_name -%}
+{%- set name = metadata.model.name -%}
+{%- set s_name = metadata.model.snake_name -%}
+{%- set base_schema = metadata.model.base_schema_name -%}
 {%- set router = s_name + "_router" -%}
-{%- set just_one_pk = model.pk|length == 1 -%}
-{%- set pk_type = (model.pk.values()|list)[0].python_type_str -%}
+{%- set just_one_pk = metadata.model.pk|length == 1 -%}
+{%- set pk_type = (metadata.model.pk.values()|list)[0].python_type_str -%}
 
 from typing import List, Optional
 from fastapi import APIRouter, Depends
@@ -14,20 +14,34 @@ import datetime
 from ..db import get_db
 from ..models import *
 from ..schemas import {{ base_schema }}
-from ..schemas import{% for c in model.relationship_combinations %} {{ base_schema }}With{{ c.name }}{% if loop.revindex0 %},{% endif %}{% endfor %}
+from ..schemas import *
+{#from ..schemas import{% for c in model.relationship_combinations %} {{ base_schema }}With{{ c.name }}{% if loop.revindex0 %},{% endif %}{% endfor %}#}
 
 {{ router }} = APIRouter(
     prefix="/{{ s_name }}",
     tags=["{{ name }}"])
 
-
-def create(
-        {%- for field_name, field in model.fields.items() %}
-        {{ field_name }}: {{ field.python_type_str }},
-        {% endfor -%}
-        db=Depends(get_db)) -> {{ base_schema }}:
+# ------------------------Query Routes------------------------
+{% for route in metadata.query_routes() %}
+{%- set schema = base_schema + route.schema_suffix -%}
+{% if route.is_all %}
+def {{ route.name }}(db=Depends(get_db)) -> Page[{{ schema }}]:
+    return paginate(db.query({{ name }}))
+{% elif just_one_pk %}
+def {{ route.name }}(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ schema }}:
+    return db.get({{ name }}, ident)
+{% endif %}
+{% endfor %}
+# -----------------------Create Routes------------------------
+{% for route in metadata.create_routes() %}
+def {{ route.name }}(
+    {%- for field_name, field in metadata.model.fields.items() %}
+    {{ field_name }}: {{ field.python_type_str }},
+    {%- endfor -%}
+    db=Depends(get_db)
+    ) -> {{ base_schema }}:
     model = {}
-    {%- for field_name in model.fields.keys() %}
+    {%- for field_name in metadata.model.fields.keys() %}
     if {{ field_name }} is not None:
         model["{{ field_name }}"] = {{ field_name }}
     {% endfor -%}
@@ -37,137 +51,74 @@ def create(
     db.commit()
     db.refresh(model)
     return model
-
-
-{{ router }}.add_api_route(
-    path="/create",
-    endpoint=create,
-    methods=["POST"],
-)
-
-{% if just_one_pk -%}
-def update(ident: {{ pk_type }},
-        {%- for field_name, field in model.fields.items() -%}
+{% endfor %}
+# -----------------------Update Routes------------------------
+{% if just_one_pk %}
+{% for route in metadata.update_routes() %}
+def {{ route.name }}(ident: {{ pk_type }},
+        {%- for field_name, field in metadata.model.fields.items() -%}
         {{field_name}}: Optional[{{field.python_type_str}}] = None,
         {% endfor -%}
         db=Depends(get_db)) -> {{ base_schema }}:
     model = db.get({{ name }}, ident)
-    {%- for field_name, field in model.fields.items() %}
+    {%- for field_name, field in metadata.model.fields.items() %}
     if {{field_name}} is not None:
         model.{{field_name}} = {{field_name}}
     {% endfor -%}
     db.commit()
     db.refresh(model)
     return model
-
-
-{{ router }}.add_api_route(
-    path="/update",
-    endpoint=update,
-    methods=["PUT"],
-)
-{%- endif %}
-
-
-def get_all(db=Depends(get_db)) -> Page[{{ base_schema }}]:
-    return paginate(db.query({{ name }}))
-
-{{ router }}.add_api_route(
-    path="/get_all",
-    endpoint=get_all,
-    methods=["GET"],
-)
-
-
-{% for combination in model.relationship_combinations %}
-def get_all_with_{{ combination.snake_name }}(db=Depends(get_db)) -> Page[{{ base_schema }}With{{ combination.name }}]:
-    return paginate(db.query({{ name }}))
-
-
-{{ router }}.add_api_route(
-    path="/get_all_with_{{ combination.snake_name }}",
-    endpoint=get_all_with_{{ combination.snake_name }},
-    methods=["GET"],
-)
 {% endfor %}
-
-{%- if just_one_pk -%}
-
-{% for relation in model.relationship %}
-{%- set target = relation.target -%}
-{%- set target_just_one_pk = target.pk|length == 1 -%}
-{%- set target_pk_type = (target.pk.values()|list)[0].python_type_str -%}
-{%- if target_just_one_pk %}
-def link_to_{{ target.snake_name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ target_pk_type }}, db=Depends(get_db)) -> {{ name }}:
-    self: {{ name }} = db.get({{ name }}, ident)
-    target: {{ target.name }} = db.get({{ target.name }}, {{ target.snake_name }}_ident)
-    {% if relation.side == 'one' %}
-    self.relation_one_{{ target.snake_name }} = target
-    {% else %}
-    self.relation_many_{{ target.snake_name }}.append(target)
-    {% endif %}
-    db.commit()
-    db.refresh(self)
-    return self
-
-def unlink_to_{{ target.snake_name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ target_pk_type }}, db=Depends(get_db)) -> {{ name }}:
-    self: {{ name }} = db.get({{ name }}, ident)
-    {% if relation.side == 'one' %}
-    self.relation_one_{{ target.snake_name }} = None
-    {% else %}
-    target: {{ target.name }} = db.get({{ target.name }}, {{ target.snake_name }}_ident)
-    self.relation_many_{{ target.snake_name }}.remove(target)
-    {% endif %}
-    db.commit()
-    db.refresh(self)
-    return self
-{% endif -%}
-{% endfor %}
-
-def get_one(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ base_schema }}:
-    return db.get({{ name }}, ident)
-
-
-{{ router }}.add_api_route(
-    path="/get_one",
-    endpoint=get_one,
-    methods=["GET"],
-)
-
-{% for combination in model.relationship_combinations %}
-def get_one_with_{{ combination.snake_name }}(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ base_schema }}With{{ combination.name }}:
-    return db.get({{ name }}, ident)
-
-
-{{ router }}.add_api_route(
-    path="/get_one_with_{{ combination.snake_name }}",
-    endpoint=get_one_with_{{ combination.snake_name }},
-    methods=["GET"],
-)
-{% endfor %}
-
-def delete_one(ident: {{ pk_type }}, db=Depends(get_db)):
-    db.delete({{ name }}, ident)
-    db.commit()
-    return {"message": "deleted"}
-
-
-{{ router }}.add_api_route(
-    path="/delete_one",
-    endpoint=delete_one,
-    methods=["DELETE"],
-)
-{%- endif %}
-
-
-def delete_all(db=Depends(get_db)):
+{% endif %}
+# -----------------------Delete Routes------------------------
+{% for route in metadata.delete_routes() %}
+{% if route.is_all %}
+def {{ route.name }}(db=Depends(get_db)):
     db.query({{ name }}).delete()
     db.commit()
     return {"message": "deleted"}
+{% elif just_one_pk %}
+def {{ route.name }}(ident: {{ pk_type }}, db=Depends(get_db)):
+    db.delete({{ name }}, ident)
+    db.commit()
+    return {"message": "deleted"}
+{% endif %}
+{% endfor %}
+# ----------------------Relation Routes-----------------------
+{% if just_one_pk %}
+{% for route in metadata.relation_routes() %}
+{%- set target = route.relation.target -%}
+{%- set target_just_one_pk = target.pk|length == 1 -%}
+{%- set target_pk_type = (target.pk.values()|list)[0].python_type_str -%}
+{% if target_just_one_pk %}
+def {{ route.name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ target_pk_type }}, db=Depends(get_db)) -> {{ base_schema }}:
+    self: {{ name }} = db.get({{ name }}, ident)
+    target: {{ target.name }} = db.get({{ target.name }}, {{ target.snake_name }}_ident)
+{%- if route.is_delete %}
+    {%- if route.relation.side == 'one' %}
+    self.relation_one_{{ target.snake_name }} = None
+    {% else %}
+    self.relation_many_{{ target.snake_name }}.remove(target)
+    {% endif -%}
+{% else %}
+    {%- if route.relation.side == 'one' %}
+    self.relation_one_{{ target.snake_name }} = target
+    {% else %}
+    self.relation_many_{{ target.snake_name }}.append(target)
+    {% endif -%}
+{%- endif %}
+    db.commit()
+    db.refresh(self)
+    return self
+{% endif %}
+{% endfor %}
+{%- endif -%}
 
-
+{% for route in metadata.routes %}
 {{ router }}.add_api_route(
-    path="/delete_all",
-    endpoint=delete_all,
-    methods=["DELETE"],
-)
+        path="{{ route.url }}",
+        endpoint={{ route.name }},
+        methods=["{{ route.methods }}"],
+        tags=["{{ name }}"],
+    )
+{% endfor %}

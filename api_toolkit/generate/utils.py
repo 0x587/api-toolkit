@@ -1,4 +1,6 @@
 import re
+from itertools import combinations
+from typing import Sequence, TypeVar
 
 
 def name_convert_to_snake(name: str) -> str:
@@ -18,3 +20,14 @@ def plural(word: str) -> str:
             return re.sub(pattern, replacement, word)
 
     return word
+
+
+T = TypeVar('T')
+
+
+def get_combinations(arr: Sequence[T]) -> Sequence[Sequence[T]]:
+    result = []
+    for r in range(1, len(arr) + 1):
+        for combination in combinations(arr, r):
+            result.append(combination)
+    return result

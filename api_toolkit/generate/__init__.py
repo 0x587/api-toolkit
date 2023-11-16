@@ -1,9 +1,9 @@
 import datetime
 import os
-from itertools import combinations
 
 from .model_metadata import ModelMetadata, LinkTableMetadata, RelationshipMetadata, RelationshipSide, FKMetadata
-from .utils import name_convert_to_snake, plural
+from .router_metadata import RouterMetadata
+from .utils import name_convert_to_snake, plural, get_combinations
 from ..define.link import OneManyLink, ManyManyLink
 from ..define.model import ModelManager
 from typing import Callable, Any, Sequence, Dict, List
@@ -30,6 +30,7 @@ class CodeGenerator:
         self.env = Environment(loader=PackageLoader('api_toolkit', 'templates'))
         self.model_metadata: Dict[str, ModelMetadata] = {}
         self.link_table_metadata: List[LinkTableMetadata] = []
+        self.router_metadata: List[RouterMetadata] = []
 
     @staticmethod
     def _generate_file(path, func: GENERATE_FUNC, **kwargs):
@@ -79,13 +80,6 @@ class CodeGenerator:
                     self.model_metadata[link.right].relationship.append(
                         RelationshipMetadata(self.model_metadata[left_name], RelationshipSide.both, link_table))
 
-        def get_combinations(arr):
-            result = []
-            for r in range(1, len(arr) + 1):
-                for combination in combinations(arr, r):
-                    result.append(combination)
-            return result
-
         for md in self.model_metadata.values():
             cbs = get_combinations(md.relationship)
             cb: Sequence[RelationshipMetadata]
@@ -95,6 +89,7 @@ class CodeGenerator:
                 'snake_name': '_and_'.join(map(lambda r: name_convert_to_snake(r.target.name), cb))
             } for cb in cbs]
             md.relationship_combinations = cbs
+        self.router_metadata = [RouterMetadata(md) for md in self.model_metadata.values()]
 
     def _define2table(self) -> str:
         template = self.env.get_template('models.py.jinja2')
@@ -116,14 +111,14 @@ class CodeGenerator:
         self._generate_file(self.schemas_path, self._define2schema)
         self._generate_file(os.path.join(self.dev_path, 'db.py'), self._generate_db_script)
 
-    def _define2router(self, model) -> str:
-        return self.env.get_template('router.py.jinja2').render(model=model)
+    def _define2router(self, metadata: RouterMetadata) -> str:
+        return self.env.get_template('router.py.jinja2').render(metadata=metadata)
 
     def _router_init(self) -> str:
         return self.env.get_template('router_init.py.jinja2').render(models=self.model_metadata.values())
 
     def generate_route(self):
-        for model in self.model_metadata.values():
-            self._generate_file(os.path.join(self.routers_path, f'{model.snake_name}.py'), self._define2router,
-                                model=model)
+        for metadata in self.router_metadata:
+            self._generate_file(os.path.join(self.routers_path, f'{metadata.model.snake_name}.py'), self._define2router,
+                                metadata=metadata)
         self._generate_file(os.path.join(self.routers_path, '__init__.py'), self._router_init)

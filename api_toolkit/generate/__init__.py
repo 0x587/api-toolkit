@@ -1,98 +1,16 @@
 import datetime
 import os
-import re
 from itertools import combinations
-from enum import StrEnum
 
+from .model_metadata import ModelMetadata, LinkTableMetadata, RelationshipMetadata, RelationshipSide, FKMetadata
+from .utils import name_convert_to_snake, plural
 from ..define.link import OneManyLink, ManyManyLink
-from ..define.model import ModelManager, Field
-from typing import Callable, Any, Sequence, Dict, List, Optional
+from ..define.model import ModelManager
+from typing import Callable, Any, Sequence, Dict, List
 import hashlib
 from jinja2 import Environment, PackageLoader
 
 GENERATE_FUNC = Callable[[Any, ...], str]
-
-FIELD_NAME = str
-
-
-class ModelMetadata:
-    def __init__(self,
-                 name: str,
-                 fields: Dict[str, Field],
-                 ):
-        self.name: str = name
-        self.plural_name: str = plural(name)
-        self.snake_name: str = name_convert_to_snake(name)
-        self.snake_plural_name: str = plural(self.snake_name)
-        self.table_name: str = '__table_name_' + self.snake_name
-        self.base_schema_name: str = name + 'Schema'
-
-        self.fields: Dict[FIELD_NAME, Field] = {name: field for name, field in fields.items() if not field.primary_key}
-        self.pk: Dict[FIELD_NAME, Field] = {name: field for name, field in fields.items() if field.primary_key}
-        # { fk_name: pk in other table}
-        self.fk: Dict[FIELD_NAME, FKMetadata] = {}
-
-        self.relationship: List[RelationshipMetadata] = []
-        self.relationship_combinations = []
-
-    def require_one_pk(self):
-        assert len(self.pk) == 1, f"model <{self.name}> must have only one pk"
-        return list(self.pk.items())[0]
-
-
-class LinkTableMetadata:
-    def __init__(self, left: ModelMetadata, right: ModelMetadata, link: ManyManyLink):
-        self.left = left
-        self.right = right
-        self.link = link
-        self.table_name = f'link_table__{left.snake_name}__and__{right.snake_name}'
-        self.left_pk_name, self.left_pk = left.require_one_pk()
-        self.right_pk_name, self.right_pk = right.require_one_pk()
-
-
-class RelationshipSide(StrEnum):
-    # one side of 1-n relationship
-    one = 'one'
-    # many side of 1-n relationship
-    many = 'many'
-    # side of n-n relationship
-    both = 'both'
-
-
-class RelationshipMetadata:
-    def __init__(self,
-                 target: ModelMetadata,
-                 side: RelationshipSide,
-                 link_table: Optional[LinkTableMetadata] = None,
-                 ):
-        self.target: ModelMetadata = target
-        self.side: RelationshipSide = side
-        self.link_table: Optional[LinkTableMetadata] = link_table
-
-
-class FKMetadata:
-    def __init__(self, field: Field, other_model: ModelMetadata):
-        self.field = field
-        self.other_model = other_model
-
-
-def name_convert_to_snake(name: str) -> str:
-    return re.sub(r'([a-z])([A-Z])', r'\1_\2', name).lower()
-
-
-def plural(word: str) -> str:
-    rules = [
-        (r'([bcdfghjklmnpqrstvwxz])y$', r'\1ies'),
-        (r'(s|x|z|ch|sh)$', r'\1es'),
-        (r'([^aeiou])o$', r'\1oes'),
-        (r'$', r's')
-    ]
-
-    for pattern, replacement in rules:
-        if re.search(pattern, word):
-            return re.sub(pattern, replacement, word)
-
-    return word
 
 
 class CodeGenerator:

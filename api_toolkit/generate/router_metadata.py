@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import List, Sequence, Dict, Optional
+from typing import List, Sequence, Optional
 from enum import StrEnum
 
 from .model_metadata import ModelMetadata, RelationshipMetadata, RelationshipSide
@@ -17,14 +17,24 @@ class BaseRoute(ABC):
     methods: RouteMethod
     name: str
     url: str
+    need_crud: bool = True
 
 
 class CreateRoute(BaseRoute):
     methods = RouteMethod.POST
 
-    def __init__(self):
+    def __init__(self, with_relation: Optional[RelationshipMetadata] = None,
+                 link_to_route: Optional['RelationRoute'] = None):
         self.name = 'create_one'
         self.url = '/create_one'
+        if with_relation is None:
+            with_relation = []
+        if with_relation:
+            self.need_crud = False
+            self.relation = with_relation
+            self.name += '_with_' + with_relation.target.snake_name
+            self.url += '_with_' + with_relation.target.snake_name
+            self.link_to_route = link_to_route
 
 
 class UpdateRoute(BaseRoute):
@@ -87,23 +97,32 @@ class RouterMetadata:
             DeleteRoute(is_all=True)
         ]
         for relation in model.relationship:
-            self.routes.append(RelationRoute(relation))
+            if len(relation.target.pk) > 1:
+                print(f"Warning: {relation.target.name} has more than one pk")
+                continue
+            link_to_route = RelationRoute(relation)
+            self.routes.append(link_to_route)
             self.routes.append(RelationRoute(relation, is_delete=True))
+            if relation.side == RelationshipSide.one:
+                self.routes.append(CreateRoute(with_relation=relation, link_to_route=link_to_route))
         for cbs in get_combinations(model.relationship):
             self.routes.append(QueryRoute(with_relation=cbs))
             self.routes.append(QueryRoute(is_all=True, with_relation=cbs))
 
     def query_routes(self):
-        return [r for r in self.routes if isinstance(r, QueryRoute)]
+        return [r for r in self.routes if isinstance(r, QueryRoute) and r.need_crud]
 
     def create_routes(self):
-        return [r for r in self.routes if isinstance(r, CreateRoute)]
+        return [r for r in self.routes if isinstance(r, CreateRoute) and r.need_crud]
 
     def update_routes(self):
-        return [r for r in self.routes if isinstance(r, UpdateRoute)]
+        return [r for r in self.routes if isinstance(r, UpdateRoute) and r.need_crud]
 
     def delete_routes(self):
-        return [r for r in self.routes if isinstance(r, DeleteRoute)]
+        return [r for r in self.routes if isinstance(r, DeleteRoute) and r.need_crud]
 
     def relation_routes(self):
-        return [r for r in self.routes if isinstance(r, RelationRoute)]
+        return [r for r in self.routes if isinstance(r, RelationRoute) and r.need_crud]
+
+    def link_create_routes(self):
+        return [r for r in self.routes if isinstance(r, CreateRoute) and not r.need_crud]

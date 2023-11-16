@@ -2,12 +2,28 @@
 {%- set s_name = metadata.model.snake_name -%}
 {%- set router = s_name + "_router" -%}
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+from ..schemas import {{ metadata.model.base_schema_name }}
 from ..crud.{{ s_name }}_crud import *
 
 {{ router }} = APIRouter(
     prefix="/{{ s_name }}",
     tags=["{{ name }}"])
+
+{% for link_create_route in metadata.link_create_routes() %}
+{%- set target = link_create_route.relation.target -%}
+{%- set target_pk_name = (target.pk.keys()|list)[0] -%}
+{%- set target_pk_type = (target.pk.values()|list)[0].python_type_str -%}
+def {{ link_create_route.name }}(
+    {{ target.snake_name }}_{{ target_pk_name }}: {{ target_pk_type }},
+    {{ s_name }}: {{ metadata.model.name }} = Depends(create_one),
+    db=Depends(get_db)) -> {{ metadata.model.base_schema_name }}:
+    {{ link_create_route.link_to_route.name }}(
+        {{ s_name }}.{{ (metadata.model.pk.keys()|list)[0] }},
+        {{ target.snake_name }}_{{ target_pk_name }}, db=db)
+    return {{ s_name }}
+{% endfor %}
+
 
 {% for route in metadata.routes %}
 {{ router }}.add_api_route(

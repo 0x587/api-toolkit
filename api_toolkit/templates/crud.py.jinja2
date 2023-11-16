@@ -6,7 +6,7 @@
 {%- set pk_type = (metadata.model.pk.values()|list)[0].python_type_str -%}
 
 from typing import List, Optional
-from fastapi import Depends
+from fastapi import Depends, HTTPException, status
 from fastapi_pagination import Page
 from fastapi_pagination.ext.sqlalchemy import paginate
 import uuid
@@ -82,12 +82,12 @@ def {{ route.name }}(ident: {{ pk_type }}, db=Depends(get_db)):
 {% if just_one_pk %}
 {% for route in metadata.relation_routes() %}
 {%- set target = route.relation.target -%}
-{%- set target_just_one_pk = target.pk|length == 1 -%}
 {%- set target_pk_type = (target.pk.values()|list)[0].python_type_str -%}
-{% if target_just_one_pk %}
 def {{ route.name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ target_pk_type }}, db=Depends(get_db)) -> {{ base_schema }}:
     self: {{ name }} = db.get({{ name }}, ident)
     target: {{ target.name }} = db.get({{ target.name }}, {{ target.snake_name }}_ident)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Target {{ target.name }} not found")
 {%- if route.is_delete %}
     {%- if route.relation.side == 'one' %}
     self.relation_one_{{ target.snake_name }} = None
@@ -104,6 +104,5 @@ def {{ route.name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ tar
     db.commit()
     db.refresh(self)
     return self
-{% endif %}
 {% endfor %}
 {%- endif -%}

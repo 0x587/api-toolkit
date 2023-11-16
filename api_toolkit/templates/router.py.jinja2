@@ -12,7 +12,7 @@ from fastapi_pagination.ext.sqlalchemy import paginate
 import uuid
 import datetime
 from ..db import get_db
-from ..models import {{ name }}
+from ..models import *
 from ..schemas import {{ base_schema }}
 from ..schemas import{% for c in model.relationship_combinations %} {{ base_schema }}With{{ c.name }}{% if loop.revindex0 %},{% endif %}{% endfor %}
 
@@ -92,6 +92,38 @@ def get_all_with_{{ combination.snake_name }}(db=Depends(get_db)) -> Page[{{ bas
 {% endfor %}
 
 {%- if just_one_pk -%}
+
+{% for relation in model.relationship %}
+{%- set target = relation.target -%}
+{%- set target_just_one_pk = target.pk|length == 1 -%}
+{%- set target_pk_type = (target.pk.values()|list)[0].python_type_str -%}
+{%- if target_just_one_pk %}
+def link_to_{{ target.snake_name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ target_pk_type }}, db=Depends(get_db)) -> {{ name }}:
+    self: {{ name }} = db.get({{ name }}, ident)
+    target: {{ target.name }} = db.get({{ target.name }}, {{ target.snake_name }}_ident)
+    {% if relation.side == 'one' %}
+    self.relation_one_{{ target.snake_name }} = target
+    {% else %}
+    self.relation_many_{{ target.snake_name }}.append(target)
+    {% endif %}
+    db.commit()
+    db.refresh(self)
+    return self
+
+def unlink_to_{{ target.snake_name }}(ident: {{ pk_type }}, {{ target.snake_name }}_ident: {{ target_pk_type }}, db=Depends(get_db)) -> {{ name }}:
+    self: {{ name }} = db.get({{ name }}, ident)
+    {% if relation.side == 'one' %}
+    self.relation_one_{{ target.snake_name }} = None
+    {% else %}
+    target: {{ target.name }} = db.get({{ target.name }}, {{ target.snake_name }}_ident)
+    self.relation_many_{{ target.snake_name }}.remove(target)
+    {% endif %}
+    db.commit()
+    db.refresh(self)
+    return self
+{% endif -%}
+{% endfor %}
+
 def get_one(ident: {{ pk_type }}, db=Depends(get_db)) -> {{ base_schema }}:
     return db.get({{ name }}, ident)
 

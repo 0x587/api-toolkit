@@ -4,9 +4,9 @@ import re
 from itertools import combinations
 from enum import StrEnum
 
-from ..define.link import OneManyLink, Link
+from ..define.link import OneManyLink, ManyManyLink
 from ..define.model import ModelManager, Field
-from typing import Callable, Type, Any, Sequence, Dict, List
+from typing import Callable, Any, Sequence, Dict, List, Optional
 import hashlib
 from jinja2 import Environment, PackageLoader
 
@@ -40,18 +40,34 @@ class ModelMetadata:
         return list(self.pk.items())[0]
 
 
+class LinkTableMetadata:
+    def __init__(self, left: ModelMetadata, right: ModelMetadata, link: ManyManyLink):
+        self.left = left
+        self.right = right
+        self.link = link
+        self.table_name = f'link_table__{left.snake_name}__and__{right.snake_name}'
+        self.left_pk_name, self.left_pk = left.require_one_pk()
+        self.right_pk_name, self.right_pk = right.require_one_pk()
+
+
 class RelationshipSide(StrEnum):
+    # one side of 1-n relationship
     one = 'one'
+    # many side of 1-n relationship
     many = 'many'
+    # side of n-n relationship
+    both = 'both'
 
 
 class RelationshipMetadata:
     def __init__(self,
                  target: ModelMetadata,
                  side: RelationshipSide,
+                 link_table: Optional[LinkTableMetadata] = None,
                  ):
         self.target: ModelMetadata = target
-        self.type: RelationshipSide = side
+        self.side: RelationshipSide = side
+        self.link_table: Optional[LinkTableMetadata] = link_table
 
 
 class FKMetadata:
@@ -95,6 +111,7 @@ class CodeGenerator:
             os.mkdir(self.routers_path)
         self.env = Environment(loader=PackageLoader('api_toolkit', 'templates'))
         self.model_metadata: Dict[str, ModelMetadata] = {}
+        self.link_table_metadata: List[LinkTableMetadata] = []
 
     @staticmethod
     def _generate_file(path, func: GENERATE_FUNC, **kwargs):
@@ -135,8 +152,14 @@ class CodeGenerator:
                     self.model_metadata[right_name].relationship.append(
                         RelationshipMetadata(self.model_metadata[left_name], RelationshipSide.one))
 
-                else:
-                    raise NotImplementedError()
+                elif isinstance(link, ManyManyLink):
+                    link_table = LinkTableMetadata(
+                        self.model_metadata[left_name], self.model_metadata[link.right], link)
+                    self.link_table_metadata.append(link_table)
+                    self.model_metadata[left_name].relationship.append(
+                        RelationshipMetadata(self.model_metadata[link.right], RelationshipSide.both, link_table))
+                    self.model_metadata[link.right].relationship.append(
+                        RelationshipMetadata(self.model_metadata[left_name], RelationshipSide.both, link_table))
 
         def get_combinations(arr):
             result = []
@@ -157,7 +180,7 @@ class CodeGenerator:
 
     def _define2table(self) -> str:
         template = self.env.get_template('models.py.jinja2')
-        return template.render(models=self.model_metadata)
+        return template.render(models=self.model_metadata, link_tables=self.link_table_metadata)
 
     def _define2schema(self) -> str:
         template = self.env.get_template('schemas.py.jinja2')

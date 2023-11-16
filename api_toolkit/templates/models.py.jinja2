@@ -11,6 +11,18 @@ import enum
 class Base(DeclarativeBase):
     pass
 
+{% for link_table in link_tables %}
+{{ link_table.table_name }} = sqlalchemy.Table(
+    "{{ link_table.table_name }}",
+    Base.metadata,
+    sqlalchemy.Column("{{ link_table.left.snake_name }}_{{ link_table.left_pk_name }}",
+                      ForeignKey("{{ link_table.left.table_name }}.{{ link_table.left_pk_name }}")),
+    sqlalchemy.Column("{{ link_table.right.snake_name }}_{{ link_table.right_pk_name }}",
+                      ForeignKey("{{ link_table.right.table_name }}.{{ link_table.right_pk_name }}")),
+)
+{% endfor %}
+
+
 {% for name, metadata in models.items() %}
 class {{ name }}(Base):
     __tablename__ = "{{ metadata.table_name }}"
@@ -28,7 +40,7 @@ class {{ name }}(Base):
 
     """fk"""
     {%- for fk_name, fk in metadata.fk.items() %}
-    {{ fk_name }}: Mapped[{{ fk.field.python_type_str }}] = mapped_column(ForeignKey("{{fk.other_model.table_name}}.{{ fk.other_model.require_one_pk()[0] }}"))
+    {{ fk_name }}: Mapped[{{ fk.field.python_type_str }}] = mapped_column(ForeignKey("{{fk.other_model.table_name}}.{{ fk.other_model.require_one_pk()[0] }}"), nullable=True)
     {% endfor -%}
     """"""
 
@@ -36,8 +48,12 @@ class {{ name }}(Base):
     {%- for relation in metadata.relationship %}
     {% if relation.side == 'one' -%}
     relation_one_{{ relation.target.snake_name }}: Mapped["{{ relation.target.name }}"] = relationship("{{ relation.target.name }}", back_populates="relation_many_{{metadata.snake_name}}")
-    {%- else -%}
+    {%- endif -%}
+    {%- if relation.side == 'many' -%}
     relation_many_{{ relation.target.snake_name }}: Mapped[List["{{ relation.target.name }}"]] = relationship("{{ relation.target.name }}", back_populates="relation_one_{{metadata.snake_name}}")
+    {%- endif -%}
+    {%- if relation.side == 'both' -%}
+    relation_many_{{ relation.target.snake_name }}: Mapped[List["{{ relation.target.name }}"]] = relationship(secondary={{ relation.link_table.table_name }}, back_populates="relation_many_{{metadata.snake_name}}")
     {%- endif %}
     {% endfor -%}
     """"""

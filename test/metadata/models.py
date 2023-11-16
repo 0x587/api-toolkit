@@ -2,14 +2,14 @@ import datetime
 from api_toolkit.define.model import BaseModel, Field
 import uuid
 from sqlalchemy import UUID, Integer, String, DateTime, Float
-from api_toolkit.define.link import OneManyLink
+from api_toolkit.define.link import OneManyLink, ManyManyLink
 
 
 class VideoStudy(BaseModel):
     class TKConfig:
         title = '视频学习项目'
         links = [
-            OneManyLink('VideoStudy', 'Video'),
+            ManyManyLink('VideoStudy', 'Video'),
         ]
 
     id = Field(uuid.UUID, UUID, primary_key=True, default_factory=uuid.uuid4)

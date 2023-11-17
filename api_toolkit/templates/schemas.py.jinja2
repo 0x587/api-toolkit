@@ -24,10 +24,10 @@ class {{ model.base_schema_name }}(BaseModel):
 {% for combination in model.relationship_combinations %}
 class {{ model.base_schema_name }}With{{ combination.name }}({{ model.base_schema_name }}):
     {%- for relation in combination.combination -%}
-    {% if relation.type == 'one' %}
-    {{ relation.target.snake_name }}: "{{ model.base_schema_name }}" = Field(alias="relation_one_{{ relation.target.snake_name }}")
+    {% if relation.side == 'one' %}
+    {{ relation.target.snake_name }}: "{{ relation.target.base_schema_name }}" = Field(alias="relation_one_{{ relation.target.snake_name }}")
     {% else %}
-    {{ relation.target.snake_plural_name }}: List["{{ model.base_schema_name }}"] = Field(alias="relation_many_{{ relation.target.snake_name }}")
+    {{ relation.target.snake_plural_name }}: List["{{ relation.target.base_schema_name }}"] = Field(alias="relation_many_{{ relation.target.snake_name }}")
     {%- endif -%}
     {% endfor %}
 {% endfor -%}

@@ -1,3 +1,5 @@
+import uuid
+import datetime
 from typing import Type, TypeVar, Tuple, List, Optional, Dict, TypedDict
 import re
 
@@ -6,6 +8,8 @@ from sqlalchemy.sql import sqltypes
 
 from .link import OneManyLink, ManyManyLink, Link
 import inspect
+
+from ..generate.mock import MockMetadata, MockType
 
 
 class BaseModel:
@@ -34,13 +38,42 @@ class Field:
                  primary_key: bool = False,
                  optional: bool = False,
                  default=None,
-                 default_factory=None):
+                 default_factory=None,
+                 mock: Optional[MockMetadata] = None):
         self.python_type = python_type
         self.python_type_str = get_type_str(python_type)
         self.sql_type = sql_type
         self.sql_type_str = get_type_str(sql_type)
         self.primary_key = primary_key
         self.optional = optional
+        if mock:
+            self.mock = mock
+        else:
+            if python_type is int:
+                self.mock = (MockType.int, (0, 100))
+            elif python_type is float:
+                self.mock = (MockType.float, (0, 100, 2))
+            elif python_type is bool:
+                self.mock = (MockType.bool, None)
+            elif python_type is str:
+                self.mock = (MockType.str, 10)
+            elif python_type is uuid.UUID:
+                self.mock = (MockType.uuid, None)
+            elif python_type is datetime.datetime:
+                self.mock = (MockType.datetime, None)
+            else:
+                self.mock = (MockType.str, 10)
+        mock_type, mock_args = self.mock
+        mock_func = f'mock_{mock_type.name}'
+        if mock_args is not None:
+            if isinstance(mock_args, tuple):
+                mock_args = ', '.join([str(arg) for arg in mock_args])
+            else:
+                mock_args = str(mock_args)
+            mock_args = f'{mock_args}'
+        else:
+            mock_args = ''
+        self.mock = (mock_func, mock_args)
         assert not (default and default_factory), 'default and default_factory can not both exist'
         if default is not None:
             self.default = default

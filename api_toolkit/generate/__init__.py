@@ -6,6 +6,7 @@ from .router_metadata import RouterMetadata
 from .utils import name_convert_to_snake, plural, get_combinations
 from ..define.link import OneManyLink, ManyManyLink
 from ..define.model import ModelManager
+from .mock import MockType
 from typing import Callable, Any, Sequence, Dict, List
 import hashlib
 from jinja2 import Environment, PackageLoader
@@ -34,6 +35,9 @@ class CodeGenerator:
         self.model_metadata: Dict[str, ModelMetadata] = {}
         self.link_table_metadata: List[LinkTableMetadata] = []
         self.router_metadata: List[RouterMetadata] = []
+        self.mock_model_count: Dict[str, int] = {}
+        self.mock_base = 10
+        self.mock_relation_rate = 2
 
     @staticmethod
     def _generate_file(path, func: GENERATE_FUNC, **kwargs):
@@ -53,6 +57,19 @@ class CodeGenerator:
                     f'This file was automatically generated in {datetime.datetime.now()}\n'
                     f'"""\n')
             f.write(content)
+
+    def _parse_mock(self):
+        model_count: Dict[str, int] = {model_name: self.mock_base for model_name in self.model_metadata.keys()}
+        for model_name, model in self.model_metadata.items():
+            if not model.relationship:
+                continue
+            for relation in [r for r in model.relationship if r.side == RelationshipSide.many]:
+                model_count[relation.target.name] = model_count[model_name] * self.mock_relation_rate
+
+        if any([v > 500 for v in model_count.values()]):
+            raise ValueError('too many mock model, maybe has circle relationship')
+
+        self.mock_model_count = model_count
 
     def parse_models(self):
         mm = ModelManager
@@ -93,6 +110,7 @@ class CodeGenerator:
             } for cb in cbs]
             md.relationship_combinations = cbs
         self.router_metadata = [RouterMetadata(md) for md in self.model_metadata.values()]
+        self._parse_mock()
 
     def _define2table(self) -> str:
         template = self.env.get_template('models.py.jinja2')
@@ -123,10 +141,20 @@ class CodeGenerator:
     def _router_init(self) -> str:
         return self.env.get_template('router_init.py.jinja2').render(models=self.model_metadata.values())
 
+    def _define2mock(self) -> str:
+        return self.env.get_template('mock.py.jinja2').render(
+            mock_model_count=self.mock_model_count, models=self.model_metadata,
+            mock_base=self.mock_base, mock_relation_rate=self.mock_relation_rate)
+
     def generate_route(self):
         for metadata in self.router_metadata:
             self._generate_file(os.path.join(self.crud_path, f'{metadata.model.snake_name}_crud.py'), self._define2crud,
                                 metadata=metadata)
-            self._generate_file(os.path.join(self.routers_path, f'{metadata.model.snake_name}_router.py'), self._define2router,
+            self._generate_file(os.path.join(self.routers_path, f'{metadata.model.snake_name}_router.py'),
+                                self._define2router,
                                 metadata=metadata)
         self._generate_file(os.path.join(self.routers_path, '__init__.py'), self._router_init)
+        self._generate_file(os.path.join(self.crud_path, '__init__.py'), lambda: '')
+
+    def generate_mock(self):
+        self._generate_file(os.path.join(self.root_path, 'mock.py'), self._define2mock)

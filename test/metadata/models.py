@@ -3,6 +3,7 @@ from api_toolkit.define.model import BaseModel, Field
 import uuid
 from sqlalchemy import UUID, Integer, String, DateTime, Float
 from api_toolkit.define.link import OneManyLink, ManyManyLink
+from api_toolkit.generate.mock import mock_str, mock_int, mock_uuid
 
 
 class VideoStudy(BaseModel):
@@ -13,7 +14,7 @@ class VideoStudy(BaseModel):
         ]
 
     id = Field(uuid.UUID, UUID, primary_key=True, default_factory=uuid.uuid4)
-    name = Field(str, String(255), default='')
+    name = Field(str, String(255), default='', mock=mock_str(6))
 
 
 class Video(BaseModel):
@@ -25,9 +26,9 @@ class Video(BaseModel):
         ]
 
     id = Field(uuid.UUID, UUID, primary_key=True, default_factory=uuid.uuid4)
-    name = Field(str, String(255), default='')
-    type = Field(int, Integer, default=0)
-    video_id = Field(uuid.UUID, UUID)
+    name = Field(str, String(255), default='', mock=mock_str(6))
+    type = Field(int, Integer, default=0, mock=mock_int(0, 10))
+    video_id = Field(uuid.UUID, UUID, mock=mock_uuid())
 
 
 class Sentence(BaseModel):
@@ -37,7 +38,7 @@ class Sentence(BaseModel):
     id = Field(uuid.UUID, UUID, primary_key=True, default_factory=uuid.uuid4)
     index = Field(int, Integer, default=0)
     text = Field(str, String(255), default='')
-    sound_id = Field(uuid.UUID, UUID)
+    sound_id = Field(uuid.UUID, UUID, mock=mock_uuid())
 
 
 class VideoRecord(BaseModel):

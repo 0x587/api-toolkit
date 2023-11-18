@@ -85,16 +85,28 @@ class RelationRoute(BaseRoute):
 class RouterMetadata:
     model: ModelMetadata
     routes: List[BaseRoute]
+    create_one: CreateRoute
+    update_one: UpdateRoute
+    get_one: QueryRoute
+    get_all: QueryRoute
+    delete_one: DeleteRoute
+    delete_all: DeleteRoute
 
     def __init__(self, model: ModelMetadata):
         self.model = model
+        self.create_one = CreateRoute()
+        self.update_one = UpdateRoute()
+        self.get_one = QueryRoute()
+        self.get_all = QueryRoute(is_all=True)
+        self.delete_one = DeleteRoute()
+        self.delete_all = DeleteRoute(is_all=True)
         self.routes = [
-            CreateRoute(),
-            UpdateRoute(),
-            QueryRoute(),
-            QueryRoute(is_all=True),
-            DeleteRoute(),
-            DeleteRoute(is_all=True)
+            self.create_one,
+            self.update_one,
+            self.get_one,
+            self.get_all,
+            self.delete_one,
+            self.delete_all,
         ]
         for relation in model.relationship:
             if len(relation.target.pk) > 1:

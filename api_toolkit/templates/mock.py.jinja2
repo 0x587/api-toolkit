@@ -1,0 +1,86 @@
+import datetime
+import random
+import uuid
+from faker import Faker
+
+from .models import *
+from .db import get_db
+
+faker = Faker(locale='zh-CN')
+db = next(get_db())
+
+def mock_str(length=10) -> str:
+    az = 'abcdefghijklmnopqrstuvwxyz'
+    return ''.join([random.choice(az + az.upper()) for _ in range(length)])
+
+
+def mock_int(min_=0, max_=10000) -> int:
+    return random.randint(min_, max_)
+
+
+def mock_float(min_=0, max_=100, precision=2) -> float:
+    return round(random.uniform(min_, max_), precision)
+
+
+def mock_bool() -> bool:
+    return random.choice([True, False])
+
+
+def mock_name() -> str:
+    return faker.name()
+
+
+def mock_uuid() -> uuid.UUID:
+    return uuid.UUID(faker.uuid4())
+
+
+def mock_phone_number() -> str:
+    return faker.phone_number()
+
+def mock_datetime() -> datetime.datetime:
+    return faker.date_time()
+
+def main():
+    # -------------------mock model-------------------
+
+    {% for model in models.values() %}
+    {%- set crud = model.snake_name + '_crud' -%}
+    from .crud import {{ crud }}
+    {{ model.snake_name }}_list = []
+    for _ in range({{ mock_model_count[model.name] }}):
+        {{ model.snake_name }}_list.append(
+            {{ model.snake_name }}_crud.create_one(
+                    {% for field_name, field in model.fields.items() %}
+                    {%- set mock_fun, mock_args = field.mock -%}
+                    {{ field_name }}={{ mock_fun }}({{ mock_args }}),
+                    {% endfor %}db=db))
+    print('mock {{ model.name }} done')
+    {% endfor %}
+
+    # -------------------mock relation-------------------
+
+    visited = set()
+    {% for model_name ,model in models.items() %}
+    {%- set crud = model.snake_name + '_crud' -%}
+    {% for relation in model.relationship %}
+    if '{{ model_name }} - {{ relation.target.name }}' not in visited:
+        if '{{ relation.side }}' == 'both':
+            visited.add('{{ model_name }} - {{ relation.target.name }}')
+            visited.add('{{ relation.target.name }} - {{ model_name }}')
+            for left_side_model in {{ model.snake_name }}_list:
+                for right_side_model in random.choices({{ relation.target.snake_name }}_list, k=random.randint(0, 2 * {{ mock_relation_rate }})):
+                    {{ crud }}.link_to_{{ relation.target.snake_name }}(
+                        left_side_model.{{ model.require_one_pk()[0] }},
+                        right_side_model.{{ relation.target.require_one_pk()[0] }},
+                        db=db)
+        if '{{ relation.side }}' == 'many':
+            visited.add('{{ model_name }} - {{ relation.target.name }}')
+            visited.add('{{ relation.target.name }} - {{ model_name }}')
+            for many_side_model in {{ model.snake_name }}_list:
+                for one_side_model in random.choices({{ relation.target.snake_name }}_list):
+                    {{ crud }}.link_to_{{ relation.target.snake_name }}(
+                        many_side_model.{{ relation.target.require_one_pk()[0] }},
+                        one_side_model.{{ model.require_one_pk()[0] }},
+                        db=db)
+    {% endfor %}
+    {% endfor %}

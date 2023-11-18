@@ -22,7 +22,7 @@ def get_app_config():
     return config_data
 
 
-def init():
+def init(root_path):
     if not os.path.isdir("alembic"):
         os.mkdir("alembic")
 
@@ -45,7 +45,7 @@ def init():
     with open("alembic/env.py", "r") as f:
         env_content = f.read()
         env_content = ("from sqlalchemy.orm import DeclarativeBase\n"
-                       "from inner_code.models import *\n") + env_content
+                       f"from {root_path}.models import *\n") + env_content
         env_content = env_content.replace("target_metadata = None",
                                           "target_metadata = Base.metadata")
     with open("alembic/env.py", "w") as f:

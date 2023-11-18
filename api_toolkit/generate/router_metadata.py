@@ -2,8 +2,8 @@ from abc import ABC
 from typing import List, Sequence, Optional
 from enum import StrEnum
 
-from .model_metadata import ModelMetadata, RelationshipMetadata, RelationshipSide
-from .utils import get_combinations
+from api_toolkit.generate.model_metadata import ModelMetadata, RelationshipMetadata, RelationshipSide
+from api_toolkit.generate.utils import get_combinations
 
 
 class RouteMethod(StrEnum):

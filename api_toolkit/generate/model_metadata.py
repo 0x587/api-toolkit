@@ -1,9 +1,9 @@
 from enum import StrEnum
 from typing import Optional, List, Dict
 
-from ..define.link import ManyManyLink
-from ..define.model import Field
-from .utils import plural, name_convert_to_snake
+from api_toolkit.generate.utils import plural, name_convert_to_snake
+from api_toolkit.define.link import ManyManyLink
+from api_toolkit.define.model import Field
 
 FIELD_NAME = str
 

@@ -1,15 +1,16 @@
 import datetime
 import os
 
-from .model_metadata import ModelMetadata, LinkTableMetadata, RelationshipMetadata, RelationshipSide, FKMetadata
-from .router_metadata import RouterMetadata
-from .utils import name_convert_to_snake, plural, get_combinations
-from ..define.link import OneManyLink, ManyManyLink
-from ..define.model import ModelManager
-from .mock import MockType
+from api_toolkit.generate.model_metadata import ModelMetadata, LinkTableMetadata, RelationshipMetadata, RelationshipSide, FKMetadata
+from api_toolkit.generate.router_metadata import RouterMetadata
+from api_toolkit.generate.utils import name_convert_to_snake, plural, get_combinations
+from api_toolkit.generate.mock import MockType
+from api_toolkit.define.link import OneManyLink, ManyManyLink
+from api_toolkit.define.model import ModelManager
 from typing import Callable, Any, Sequence, Dict, List
 import hashlib
 from jinja2 import Environment, PackageLoader
+import typer
 
 GENERATE_FUNC = Callable[[Any, ...], str]
 
@@ -40,19 +41,39 @@ class CodeGenerator:
         self.mock_relation_rate = 2
 
     @staticmethod
+    def _check_file_valid(path):
+        with open(path, 'r') as f:
+            line = f.readline()
+            if not line.startswith('# generate_hash:'):
+                return False
+            content_hash = line.split(':')[1].strip()
+            f.readline()
+            f.readline()
+            f.readline()
+            content = f.read()
+            return hashlib.md5(content.encode('utf8')).hexdigest() == content_hash
+
+    @staticmethod
     def _generate_file(path, func: GENERATE_FUNC, **kwargs):
         content = func(**kwargs)
-        content_hash = hashlib.md5(content.encode('utf8')).hexdigest()
+        generate_hash = hashlib.md5(content.encode('utf8')).hexdigest()
         if os.path.exists(path):
             with open(path, 'r') as f:
                 line = f.readline()
-                if line.startswith('# content_hash:'):
-                    old_hash = line.split(':')[1].strip()
-                    if old_hash == content_hash:
-                        print(f'file {path} is not changed, skip generate')
+                if line.startswith('# generate_hash:'):
+                    head_hash = line.split(':')[1].strip()
+                else:
+                    head_hash = None
+                if head_hash == generate_hash and CodeGenerator._check_file_valid(path):
+                    print(f'file {path} is up to date, skip generate')
+                    return
+                else:
+                    overwrite = typer.confirm(
+                        f'file {path} has been changed or is out of date, do you want to overwrite it?')
+                    if not overwrite:
                         return
         with open(path, 'w') as f:
-            f.write(f'# content_hash: {content_hash}\n')
+            f.write(f'# generate_hash: {generate_hash}\n')
             f.write(f'"""\n'
                     f'This file was automatically generated in {datetime.datetime.now()}\n'
                     f'"""\n')
@@ -146,7 +167,7 @@ class CodeGenerator:
             mock_model_count=self.mock_model_count, models=self.model_metadata,
             mock_base=self.mock_base, mock_relation_rate=self.mock_relation_rate)
 
-    def generate_route(self):
+    def generate_routers(self):
         for metadata in self.router_metadata:
             self._generate_file(os.path.join(self.crud_path, f'{metadata.model.snake_name}_crud.py'), self._define2crud,
                                 metadata=metadata)

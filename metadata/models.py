@@ -1,9 +1,9 @@
 import datetime
-from api_toolkit.define.model import BaseModel, Field
 import uuid
 from sqlalchemy import UUID, Integer, String, DateTime, Float
-from api_toolkit.define.link import OneManyLink, ManyManyLink
 from api_toolkit.generate.mock import mock_str, mock_int, mock_uuid
+from api_toolkit.define import BaseModel, Field
+from api_toolkit.define import OneManyLink, ManyManyLink
 
 
 class VideoStudy(BaseModel):

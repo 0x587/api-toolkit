@@ -6,7 +6,7 @@ from typing import Type, TypeVar, Tuple, List, Optional, Dict
 from sqlalchemy.sql import sqltypes
 
 from api_toolkit.generate.mock import MockMetadata, MockType
-from api_toolkit.define.link import OneManyLink, ManyManyLink, Link
+from api_toolkit.define.link import Link
 
 
 class BaseModel:

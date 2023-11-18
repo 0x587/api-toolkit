@@ -2,8 +2,7 @@ from enum import StrEnum
 from typing import Optional, List, Dict
 
 from api_toolkit.generate.utils import plural, name_convert_to_snake
-from api_toolkit.define.link import ManyManyLink
-from api_toolkit.define.model import Field
+from api_toolkit.define import ManyManyLink, Field
 
 FIELD_NAME = str
 

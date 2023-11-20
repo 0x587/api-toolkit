@@ -14,8 +14,8 @@ app = typer.Typer()
 @app.command('generate')
 def generate(root_path: Path = 'inner_code', table: bool = True, router: bool = True, mock: bool = True):
     if not root_path.is_dir():
-        print(f'root_path: {root_path} is not a dir')
-        raise typer.Exit(-1)
+        typer.confirm(f'root_path: {root_path} is not a dir, do you want to create it?', abort=True)
+        root_path.mkdir(parents=True)
     generator = CodeGenerator(root_path)
     generator.parse_models()
     if table:
